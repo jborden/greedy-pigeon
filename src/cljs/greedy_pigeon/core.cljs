@@ -118,9 +118,9 @@
   (let [geometry (js/THREE.PlaneGeometry. 5 5 1)
         material (js/THREE.MeshBasicMaterial. (clj->js {:color 0xff0000}))
         mesh (js/THREE.Mesh. geometry material)
+        bounding-box (js/THREE.Box3.)
         object3d ($ (js/THREE.Object3D.) add mesh)
         box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
-        bounding-box (js/THREE.Box3.)
         move-increment 5
         _ ($! object3d :position.x 0)
         _ ($! object3d :position.y 0)
@@ -236,6 +236,62 @@
     tables
     ))
 
+(defn simple-plane
+  "Return an object3d that represents a simple plane box centered at x,y"
+  [x y]
+  (let [geometry (js/THREE.PlaneGeometry. 20 20 1)
+        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0x00ff00}))
+        mesh (js/THREE.Mesh. geometry material)
+        object3d ($ (js/THREE.Object3D.) add mesh)]
+    ($! object3d :position.x x)
+    ($! object3d :position.y y)
+    object3d))
+
+(defn plane->bounding-box
+  "Given an object3d that represents a simple plane, return a bounding box for it"
+  [plane]
+  (let [bounding-box (js/THREE.Box3.)]
+    ($ bounding-box setFromObject plane)
+    bounding-box))
+
+(defn allowed-directions
+  "Given the hero and the tables objects, determine which tables the hero can jump to"
+  [hero tables]
+  (let [table-width 200
+        table-height 200
+        hero-x ($ (.getObject3d hero) :position.x)
+        hero-y ($ (.getObject3d hero) :position.y)
+        ;; top-left-plane (simple-plane (- hero-x table-width)
+        ;;                              (+ hero-y table-height))
+        ;; top-right-plane (simple-plane (+ hero-x table-width)
+        ;;                               (+ hero-y table-height))
+        ;; bottom-left-plane (simple-plane (- hero-x table-width)
+        ;;                                 (- hero-y table-height))
+        ;; bottom-right-plane (simple-plane (+ hero-x table-width)
+        ;;                                  (- hero-y table-height))
+        ;; planes (vector top-left-plane top-right-plane bottom-left-plane bottom-right-plane)
+        ;; boxes (mapv plane->bounding-box planes)
+        ;; contains-box? (fn [box object] ())
+        top-left-point (js/THREE.Vector3. (- hero-x table-width)
+                                          (+ hero-y table-height)
+                                          0)
+        top-right-point (js/THREE.Vector3.
+                         (+ hero-x table-width)
+                         (+ hero-y table-height)
+                         0)
+        bottom-left-point (js/THREE.Vector3. (- hero-x table-width)
+                                             (- hero-y table-height)
+                                             0)
+        bottom-right-point (js/THREE.Vector3. (+ hero-x table-width)
+                                              (- hero-y table-height)
+                                              0)
+        contains-point? (fn [point object]
+                          ($ (.getBoundingBox object) containsPoint point))]
+    {:top-left (first (filter (partial contains-point? top-left-point) tables))
+     :top-right (first (filter (partial contains-point? top-right-point) tables))
+     :bottom-left (first (filter (partial contains-point? bottom-left-point) tables))
+     :bottom-right (first (filter (partial contains-point? bottom-right-point) tables))}))
+
 (defn game-won-fn
   []
   (menu/menu-screen
@@ -283,12 +339,25 @@
   (let [hero (r/cursor state [:hero])
         ;;        enemy (r/cursor state [:enemy])
         ;;        goal (r/cursor state [:goal])
+        tables (r/cursor state [:tables])
         render-fn (r/cursor state [:render-fn])
         key-state (r/cursor state [:key-state])
         paused? (r/cursor state [:paused?])
         key-state (r/cursor state [:key-state])
         ticks-max 20
-        ticks-counter (r/cursor state [:ticks-counter])]
+        p-ticks-counter (r/cursor state [:p-ticks-counter])
+        up-ticks-counter (r/cursor state [:up-ticks-counter])
+        right-ticks-counter (r/cursor state [:right-ticks-counter])
+        down-ticks-counter (r/cursor state [:down-ticks-counter])
+        left-ticks-counter (r/cursor state [:left-ticks-counter])
+        hero-allowed-directions (r/cursor state [:hero-allowed-directions])
+        move-hero! (fn [hero allowed-directions direction]
+                     (if (direction allowed-directions)
+                       (.moveTo hero
+                                ($ (.getObject3d (direction allowed-directions))
+                                   :position.x)
+                                ($ (.getObject3d (direction allowed-directions))
+                                   :position.y))))]
     (fn [delta-t]
       (@render-fn)
       #_      (when (.intersectsBox @goal (.getBoundingBox @hero))
@@ -297,23 +366,42 @@
            (init-game-lost-screen))
       ;; p-key is up, reset the delay
       (if (not (:p @key-state))
-        (reset! ticks-counter 0))
+        (reset! p-ticks-counter 0))
+      (if (and (not (:up-arrow @key-state))
+               (not (:w @key-state)))
+        (reset! up-ticks-counter 0))
+      (if (and (not (:left-arrow @key-state))
+               (not (:d @key-state)))
+        (reset! left-ticks-counter 0))
+      (if (and (not (:down-arrow @key-state))
+               (not (:s @key-state)))
+        (reset! down-ticks-counter 0))
+      (if (and (not (:right-arrow @key-state))
+               (not (:a @key-state)))
+        (reset! right-ticks-counter 0))
       ;; (.log js/console "x " ($ (.getObject3d @hero) :position.x))
       ;; (.log js/console "y " ($ (.getObject3d @hero) :position.y))
       ;; chase hero
       ;;      (.chaseHero @enemy @hero 1.4)
+      
+      ;; set the allowed directions
+      (reset! hero-allowed-directions (allowed-directions @hero @tables))
       ;; move the hero when not paused
       (when-not @paused?
         (controls/key-down-handler
          @key-state
-         {:left-fn #(.moveLeft @hero)
-          :right-fn #(.moveRight @hero)
-          :up-fn #(.moveUp @hero)
-          :down-fn #(.moveDown @hero)}))
+         {:up-fn (fn []
+                   (controls/delay-repeat ticks-max up-ticks-counter #(move-hero! @hero @hero-allowed-directions :top-right)))
+          :left-fn (fn []
+                     (controls/delay-repeat ticks-max left-ticks-counter #(move-hero! @hero @hero-allowed-directions :top-left)))
+          :down-fn (fn []
+                     (controls/delay-repeat ticks-max down-ticks-counter #(move-hero! @hero @hero-allowed-directions :bottom-left)))
+          :right-fn (fn []
+                      (controls/delay-repeat ticks-max right-ticks-counter #(move-hero! @hero @hero-allowed-directions :bottom-right)))}))
       ;; listen for the p-key depress
       (controls/key-down-handler
        @key-state
-       {:p-fn (fn [] (controls/delay-repeat ticks-max ticks-counter
+       {:p-fn (fn [] (controls/delay-repeat ticks-max p-ticks-counter
                                             #(reset! paused? (not @paused?))))}))))
 
 (defn ^:export init-game
@@ -356,7 +444,11 @@
     ($ scene add (.getObject3d hero))
     ($ scene add (.getBoxHelper hero))
     ($ scene add (origin))
-    ;;(.moveTo hero 0 0)
+    (.moveTo hero 0 200)
+    (.log js/console (clj->js (allowed-directions hero tables)))
+    ;; (doall (mapv (fn [direction]
+    ;;                ($ scene add direction))
+    ;;              (allowed-directions hero)))
     ;; ($ scene add (.getObject3d goal))
     ;; ($ scene add (.getBoxHelper goal))
     ;; ($ scene add (.getObject3d table))
