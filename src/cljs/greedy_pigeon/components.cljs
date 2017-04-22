@@ -10,7 +10,7 @@
     [:div {:id "title-screen"}
      [:div {:id "title"
             :style {:color "#FFF"}}
-      "template-game"]
+      "Greedy Pigeon"]
      [:div {:id "title-menu"}
       [:div {:id "start"}
        [:div {:class "selection-symbol"}

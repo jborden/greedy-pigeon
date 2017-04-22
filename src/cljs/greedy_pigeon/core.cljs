@@ -16,11 +16,14 @@
                     :init-game (constantly true)
                     :init-game-won-fn (constantly true)
                     :init-title-screen-fn (constantly true)
-                    :font nil})
+                    :font nil
+                    :stage [[0 0 1 0 0]
+                            [0 1 0 1 0]
+                            [1 0 1 0 1]]})
 
 (defonce state (r/atom initial-state))
 
-(defn enemy
+#_ (defn enemy
   []
   (let [geometry (js/THREE.PlaneGeometry. 100 100 1)
         material (js/THREE.MeshBasicMaterial. (clj->js {:color 0xFF0000}))
@@ -65,13 +68,14 @@
 
 (defn hero
   []
-  (let [geometry (js/THREE.PlaneGeometry. 200 200 1)
+  (let [geometry (js/THREE.PlaneGeometry. 60 60 1)
         material (js/THREE.MeshBasicMaterial. (clj->js {:color 0x0000FF}))
         mesh (js/THREE.Mesh. geometry material)
         object3d ($ (js/THREE.Object3D.) add mesh)
         box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
         bounding-box (js/THREE.Box3.)
-        move-increment 5]
+        move-increment 5
+        _ ($! object3d :position.z 1)]
     (reify
       Object
       (updateBox [this]
@@ -89,9 +93,39 @@
       (moveDown [this]
         ($ object3d translateY (- move-increment))
         (.updateBox this))
+      (moveTo [this x y]
+        (let [ ;; x-center (/ (- ($ bounding-box :max.x)
+              ;;                ($ bounding-box :min.x))
+              ;;             2)
+              ;; y-center (/
+              ;;           (- ($ bounding-box :max.y)
+              ;;              ($ bounding-box :min.y))
+              ;;           2)
+              ;; current-x ($ object3d :position.x)
+              ;; current-y ($ object3d :position.y)
+              ]
+          ;; ($! object3d :position.x (- x x-center))
+          ;; ($! object3d :position.y (- y y-center))
+          ($! object3d :position.x x)
+          ($! object3d :position.y y)
+          (.updateBox this)))
       (getObject3d [this] object3d)
       (getBoundingBox [this] bounding-box)
       (getBoxHelper [this] box-helper))))
+
+(defn origin
+  []
+  (let [geometry (js/THREE.PlaneGeometry. 5 5 1)
+        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0xff0000}))
+        mesh (js/THREE.Mesh. geometry material)
+        object3d ($ (js/THREE.Object3D.) add mesh)
+        box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
+        bounding-box (js/THREE.Box3.)
+        move-increment 5
+        _ ($! object3d :position.x 0)
+        _ ($! object3d :position.y 0)
+        _ ($! object3d :position.z 1)]
+    object3d))
 
 (defn load-font!
   [url font-atom]
@@ -101,13 +135,10 @@
      (fn [font]
        (reset! font-atom font))))
 
-(defn goal
-  [font-atom text]
-  (let [geometry (js/THREE.TextGeometry. text
-                                         (clj->js {:font @font-atom
-                                                   :size 50
-                                                   :height 10}))
-        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0xD4AF37}))
+(defn table
+  []
+  (let [geometry (js/THREE.PlaneGeometry. 200 200 1)
+        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0xFFC0CB}))
         mesh (js/THREE.Mesh. geometry material)
         object3d ($ (js/THREE.Object3D.) add mesh)
         box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
@@ -125,16 +156,85 @@
       (intersectsBox [this box]
         ($ (.getBoundingBox this) intersectsBox box))
       (moveTo [this x y]
-        (let [x-center (/ (- ($ bounding-box :max.x)
-                             ($ bounding-box :min.x))
-                          2)
-              y-center (/
-                        (- ($ bounding-box :max.y)
-                           ($ bounding-box :min.y))
-                        2)]
-          ($! object3d :position.x (- x x-center))
-          ($! object3d :position.y (- y y-center))
-          (.updateBox this))))))
+        (let [ ;; x-center (/ (- ($ bounding-box :max.x)
+              ;;                ($ bounding-box :min.x))
+              ;;             2)
+              ;; y-center (/
+              ;;           (- ($ bounding-box :max.y)
+              ;;              ($ bounding-box :min.y))
+              ;;           2)
+              ]
+          ;; ($! object3d :position.x (- x x-center))
+          ;; ($! object3d :position.y (- y y-center))
+          ($! object3d :position.x x)
+          ($! object3d :position.y y)
+          (.updateBox this)))
+      (translate [this x y]
+        ($ object3d translateX x)
+        ($ object3d translateY y)
+        (.updateBox this)))))
+
+(defn set-stage
+  "Given a vector of vectors, return a vector of table in their proper places"
+  [m]
+  (let [table-width 200
+        table-height 200
+        total-width (* table-width (count (first m)))
+        total-height (* table-height (count m))
+        tables  (filter (comp not nil?)
+                        (apply concat (map-indexed (fn [row itm]
+                                                     (map-indexed (fn [col itm]
+                                                                    (if (= itm 1)
+                                                                      (let [table (table)]
+                                                                        (.updateBox table)
+                                                                        (.moveTo table (* col table-width) (* table-height row -1))
+                                                                        table))) itm)) m)))
+        group (js/THREE.Group.)
+        ;; _ (doall (map #(.log js/console (.getObject3d %)) tables))
+        _ (doall (map #($ group add (.getObject3d %)) tables))
+        ;; bounding-box (js/THREE.Box3.)
+        ;; _ ($ bounding-box setFromObject group)
+        ;; x-center (/ (- ($ bounding-box :max.x)
+        ;;                ($ bounding-box :min.x))
+        ;;             2)
+        ;; y-center (/
+        ;;           (- ($ bounding-box :max.y)
+        ;;              ($ bounding-box :min.y))
+        ;;           2)
+        ;; new-x (- 0 x-center)
+        ;; new-y (- 0 y-center)
+        translate-x (* (- (/ total-width 2) (/ table-width 2)) -1)
+        translate-y (- (/ total-height 2) (/ table-height 2))
+        ]
+    ;; (.log js/console group)
+    ;; (.log js/console x-center)
+    ;; (.log js/console y-center)
+    ;; (.log js/console new-x)
+    ;; (.log js/console new-y)
+    ;; (.log js/console ($ bounding-box :min))
+    ;; (.log js/console ($ bounding-box :max))
+    ;; (.log js/console ($ bounding-box :min.y))
+    ;; (.log js/console ($ bounding-box :max.y))
+    ;; (.log js/console ($ bounding-box :position))
+    (doall (map (fn [table]
+                  (.translate table translate-x translate-y)) tables))
+    ;; (.log js/console width)
+    ;; (.log js/console height)
+    ;; ($ group translateX (+ (* (/ width 2) -1) 200))
+    ;; ($ group translateY (/ height 2))
+    ;; ($! group :position.x 0)
+    ;; ($! group :position.y 0)
+    ;; (.log js/console ($ group :position.x))
+    ;; (.log js/console ($ group :position.y))
+    ;; ($ group updateMatrix)
+    ;; ($ group translateX (* (/ width 2) -1))
+    ;; ($ group translateY (/ height 2))
+    ;; ($! group :position.x 0)
+    ;; ($! group :position.y 0)
+    ;; (.log js/console group)
+    ;;    group
+    tables
+    ))
 
 (defn game-won-fn
   []
@@ -181,8 +281,8 @@
   "The main game, as a fn of delta-t and state"
   []
   (let [hero (r/cursor state [:hero])
-        enemy (r/cursor state [:enemy])
-        goal (r/cursor state [:goal])
+        ;;        enemy (r/cursor state [:enemy])
+        ;;        goal (r/cursor state [:goal])
         render-fn (r/cursor state [:render-fn])
         key-state (r/cursor state [:key-state])
         paused? (r/cursor state [:paused?])
@@ -191,15 +291,17 @@
         ticks-counter (r/cursor state [:ticks-counter])]
     (fn [delta-t]
       (@render-fn)
-      (when (.intersectsBox @goal (.getBoundingBox @hero))
-        (init-game-won-screen))
-      (when (.intersectsBox @enemy (.getBoundingBox @hero))
-        (init-game-lost-screen))
+      #_      (when (.intersectsBox @goal (.getBoundingBox @hero))
+                (init-game-won-screen))
+      #_ (when (.intersectsBox @enemy (.getBoundingBox @hero))
+           (init-game-lost-screen))
       ;; p-key is up, reset the delay
       (if (not (:p @key-state))
         (reset! ticks-counter 0))
+      ;; (.log js/console "x " ($ (.getObject3d @hero) :position.x))
+      ;; (.log js/console "y " ($ (.getObject3d @hero) :position.y))
       ;; chase hero
-;;      (.chaseHero @enemy @hero 1.4)
+      ;;      (.chaseHero @enemy @hero 1.4)
       ;; move the hero when not paused
       (when-not @paused?
         (controls/key-down-handler
@@ -231,29 +333,47 @@
         render-fn (display/render renderer scene camera)
         time-fn (r/cursor state [:time-fn])
         hero (hero)
-        enemy (enemy)
+        ;;        enemy (enemy)
         font-atom (r/cursor state [:font])
-        goal (goal font-atom "Goal")
+        ;;goal (goal font-atom "Goal")
+        ;;table (table 0 0)
+        tables (set-stage (:stage @state))
         paused? (r/cursor state [:paused?])
         key-state (r/cursor state [:key-state])
         key-state-tracker (r/cursor state [:key-state-tracker])]
+    ;;(.log js/console (clj->js tables))
     (swap! state assoc
            :render-fn render-fn
            :hero hero
-           :goal goal
-           :enemy enemy
+           ;;           :goal goal
+           ;;           :enemy enemy
+           :tables tables
            :scene scene)
     (.updateBox hero)
-    (.updateBox goal)
-    (.updateBox enemy)
+    ;;    (.updateBox goal)
+    ;;    (.updateBox table)
+    ;;  (.updateBox enemy)
     ($ scene add (.getObject3d hero))
     ($ scene add (.getBoxHelper hero))
-    ($ scene add (.getObject3d goal))
-    ($ scene add (.getBoxHelper goal))
-    ($ scene add (.getObject3d enemy))
-    ($ scene add (.getBoxHelper enemy))
-    (.moveTo goal 0 -300)
-    (.moveTo enemy 50 400)
+    ($ scene add (origin))
+    ;;(.moveTo hero 0 0)
+    ;; ($ scene add (.getObject3d goal))
+    ;; ($ scene add (.getBoxHelper goal))
+    ;; ($ scene add (.getObject3d table))
+    ;; ($ scene add (.getBoxHelper table))
+    (doall (map (fn [table]
+                  ;;(.log js/console (.getBoxHelper table))
+                  ($ scene add (.getObject3d table))
+                  ($ scene add (.getBoxHelper table))) tables))
+    ;; ($ scene add (js/THREE.BoxHelper. tables))
+    ;; ($! tables :position.x 0)
+    ;; ($! tables :position.y 0)
+    ;; ($ scene add tables)
+    ;;    ($ scene add (.getObject3d enemy))
+    ;;    ($ scene add (.getBoxHelper enemy))
+    ;;    (.moveTo goal 0 -300)
+    ;;    (.moveTo table 0 -300)
+    ;;    (.moveTo enemy 50 400)
     (reset! time-fn (game-fn))
     (r/render
      [:div {:id "root-node"}
