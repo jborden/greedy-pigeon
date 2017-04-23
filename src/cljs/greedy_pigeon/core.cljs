@@ -20,65 +20,27 @@
                     :color-cycle [0xFF69B4 0x69FF83 0xF9FF69]
                     :win-color 0xF9FF69
                     :cycle-colors? false
-                    :stage [[0 0 1 0 0]
-                            [0 1 0 1 0]
-                            [1 0 1 0 1]]})
+                    :stage [[0 0 0 0 0 0 1 0 0 0 0 0 0]
+                            [0 0 0 0 0 1 0 1 0 0 0 0 0]
+                            [0 0 0 0 1 0 1 0 1 0 0 0 0]
+                            [0 0 0 1 0 1 0 1 0 1 0 0 0]
+                            [0 0 1 0 1 0 1 0 1 0 1 0 0]
+                            [0 1 0 1 0 1 0 1 0 1 0 1 0]
+                            [1 0 1 0 1 0 1 0 1 0 1 0 1]
+                            []]})
 
 (defonce state (r/atom initial-state))
 
-#_ (defn enemy
+(defn enemy
   []
-  (let [geometry (js/THREE.PlaneGeometry. 100 100 1)
+  (let [geometry (js/THREE.PlaneGeometry. 60 60 1)
         material (js/THREE.MeshBasicMaterial. (clj->js {:color 0xFF0000}))
         mesh (js/THREE.Mesh. geometry material)
         object3d ($ (js/THREE.Object3D.) add mesh)
         box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
         bounding-box (js/THREE.Box3.)
-        move-increment 5]
-    (reify
-      Object
-      (updateBox [this]
-        ($ box-helper update object3d)
-        ($ bounding-box setFromObject box-helper))
-      (intersectsBox [this box]
-        ($ (.getBoundingBox this) intersectsBox box))
-      (getObject3d [this] object3d)
-      (getBoundingBox [this] bounding-box)
-      (getBoxHelper [this] box-helper)
-      (moveTo [this x y]
-        (let [x-center (/ (- ($ bounding-box :max.x)
-                             ($ bounding-box :min.x))
-                          2)
-              y-center (/
-                        (- ($ bounding-box :max.y)
-                           ($ bounding-box :min.y))
-                        2)]
-          ($! object3d :position.x (- x x-center))
-          ($! object3d :position.y (- y y-center))
-          (.updateBox this)))
-      (chaseHero [this hero dL]
-        (let [hero-object (.getObject3d hero)
-              this-object (.getObject3d this)
-              this->hero
-              (utilities/normalized-distance-vector
-               this-object hero-object)]
-          ;; if the distance between hero and this is larger than dL
-          ;; pursue hero
-          (when (> (utilities/calculate-distance hero-object this-object) dL)
-            ($ this-object position.add
-               ($ this->hero multiplyScalar dL))
-            (.updateBox this)))))))
-
-(defn hero
-  []
-  (let [geometry (js/THREE.PlaneGeometry. 60 60 1)
-        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0x0000FF}))
-        mesh (js/THREE.Mesh. geometry material)
-        object3d ($ (js/THREE.Object3D.) add mesh)
-        box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
-        bounding-box (js/THREE.Box3.)
         move-increment 5
-        _ ($! object3d :position.z 1)]
+        _ ($! object3d :position.z 10)]
     (reify
       Object
       (updateBox [this]
@@ -97,18 +59,43 @@
         ($ object3d translateY (- move-increment))
         (.updateBox this))
       (moveTo [this x y]
-        (let [ ;; x-center (/ (- ($ bounding-box :max.x)
-              ;;                ($ bounding-box :min.x))
-              ;;             2)
-              ;; y-center (/
-              ;;           (- ($ bounding-box :max.y)
-              ;;              ($ bounding-box :min.y))
-              ;;           2)
-              ;; current-x ($ object3d :position.x)
-              ;; current-y ($ object3d :position.y)
-              ]
-          ;; ($! object3d :position.x (- x x-center))
-          ;; ($! object3d :position.y (- y y-center))
+        (do
+          ($! object3d :position.x x)
+          ($! object3d :position.y y)
+          (.updateBox this)))
+      (getObject3d [this] object3d)
+      (getBoundingBox [this] bounding-box)
+      (getBoxHelper [this] box-helper))))
+
+(defn hero
+  []
+  (let [geometry (js/THREE.PlaneGeometry. 60 60 1)
+        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0x0000FF}))
+        mesh (js/THREE.Mesh. geometry material)
+        object3d ($ (js/THREE.Object3D.) add mesh)
+        box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
+        bounding-box (js/THREE.Box3.)
+        move-increment 5
+        _ ($! object3d :position.z 10)]
+    (reify
+      Object
+      (updateBox [this]
+        ($ box-helper update object3d)
+        ($ bounding-box setFromObject box-helper))
+      (moveLeft [this]
+        ($ object3d translateX (- move-increment))
+        (.updateBox this))
+      (moveRight [this]
+        ($ object3d translateX move-increment)
+        (.updateBox this))
+      (moveUp [this]
+        ($ object3d translateY move-increment)
+        (.updateBox this))
+      (moveDown [this]
+        ($ object3d translateY (- move-increment))
+        (.updateBox this))
+      (moveTo [this x y]
+        (do
           ($! object3d :position.x x)
           ($! object3d :position.y y)
           (.updateBox this)))
@@ -286,17 +273,6 @@
         table-height 200
         hero-x ($ (.getObject3d hero) :position.x)
         hero-y ($ (.getObject3d hero) :position.y)
-        ;; top-left-plane (simple-plane (- hero-x table-width)
-        ;;                              (+ hero-y table-height))
-        ;; top-right-plane (simple-plane (+ hero-x table-width)
-        ;;                               (+ hero-y table-height))
-        ;; bottom-left-plane (simple-plane (- hero-x table-width)
-        ;;                                 (- hero-y table-height))
-        ;; bottom-right-plane (simple-plane (+ hero-x table-width)
-        ;;                                  (- hero-y table-height))
-        ;; planes (vector top-left-plane top-right-plane bottom-left-plane bottom-right-plane)
-        ;; boxes (mapv plane->bounding-box planes)
-        ;; contains-box? (fn [box object] ())
         top-left-point (js/THREE.Vector3. (- hero-x table-width)
                                           (+ hero-y table-height)
                                           0)
@@ -401,7 +377,7 @@
   "The main game, as a fn of delta-t and state"
   []
   (let [hero (r/cursor state [:hero])
-        ;;        enemy (r/cursor state [:enemy])
+        enemy (r/cursor state [:enemy])
         ;;        goal (r/cursor state [:goal])
         tables (r/cursor state [:tables])
         render-fn (r/cursor state [:render-fn])
@@ -409,12 +385,15 @@
         paused? (r/cursor state [:paused?])
         key-state (r/cursor state [:key-state])
         ticks-max 20
+        enemy-ticks (r/cursor state [:enemy-ticks])
+        enemy-max-ticks 45
         p-ticks-counter (r/cursor state [:p-ticks-counter])
         up-ticks-counter (r/cursor state [:up-ticks-counter])
         right-ticks-counter (r/cursor state [:right-ticks-counter])
         down-ticks-counter (r/cursor state [:down-ticks-counter])
         left-ticks-counter (r/cursor state [:left-ticks-counter])
         hero-allowed-directions (r/cursor state [:hero-allowed-directions])
+        enemy-allowed-directions (r/cursor state [:enemy-allowed-directions])
         move-hero! (fn [hero allowed-directions direction]
                      (if (direction allowed-directions)
                        (.moveTo hero
@@ -422,6 +401,10 @@
                                    :position.x)
                                 ($ (.getObject3d (direction allowed-directions))
                                    :position.y))))
+        move-enemy! (fn [enemy table]
+                      (.moveTo enemy
+                               ($ (.getObject3d table) :position.x)
+                               ($ (.getObject3d table) :position.y)))
         color-cycle (r/cursor state [:color-cycle])
         cycle-colors? (r/cursor state [:cycle-colors?])
         win-color (r/cursor state [:win-color])]
@@ -446,19 +429,16 @@
       (if (and (not (:right-arrow @key-state))
                (not (:d @key-state)))
         (reset! right-ticks-counter 0))
-      ;; (.log js/console "x " ($ (.getObject3d @hero) :position.x))
-      ;; (.log js/console "y " ($ (.getObject3d @hero) :position.y))
-      ;; chase hero
-      ;;      (.chaseHero @enemy @hero 1.4)
+
       (reset-occupation! @hero @tables)
       (set-colors! @color-cycle @cycle-colors? @tables)
+      ;; is the game won?
       (if (game-won? @tables @win-color)
         (init-game-won-screen))
-      ;;(.setColor (first @tables) 0xff0000)
-      ;;(.log js/console "color cycle " (clj->js @color-cycle))
-      ;;(.log js/console "tables " (clj->js @tables))
       ;; set the allowed directions
       (reset! hero-allowed-directions (allowed-directions @hero @tables))
+      (reset! enemy-allowed-directions (allowed-directions @enemy @tables))
+
       ;; move the hero when not paused
       (when-not @paused?
         (controls/key-down-handler
@@ -470,7 +450,18 @@
           :down-fn (fn []
                      (controls/delay-repeat ticks-max down-ticks-counter #(move-hero! @hero @hero-allowed-directions :bottom-left)))
           :right-fn (fn []
-                      (controls/delay-repeat ticks-max right-ticks-counter #(move-hero! @hero @hero-allowed-directions :bottom-right)))}))
+                      (controls/delay-repeat ticks-max right-ticks-counter #(move-hero! @hero @hero-allowed-directions :bottom-right)))})
+        ;; reset enemy ticks
+        (when (< @enemy-ticks enemy-max-ticks)
+          (swap! enemy-ticks inc))
+        ;; ;; move the enemy
+        (when (= @enemy-ticks enemy-max-ticks)
+          (let [table-options (filter (comp not nil?) (vals @enemy-allowed-directions))]
+            (move-enemy! @enemy (nth table-options (rand-int (count table-options))))
+            (reset! enemy-ticks 0)))
+        ;; is the game lost?
+        (if ($ (.getBoundingBox @enemy) containsBox (.getBoundingBox @hero))
+          (init-game-lost-screen)))
       ;; listen for the p-key depress
       (controls/key-down-handler
        @key-state
@@ -489,35 +480,34 @@
                  0.1
                  20000)
                 scene
-                [0 0 1300])
+                [0 0 3200])
         renderer (display/create-renderer)
         render-fn (display/render renderer scene camera)
         time-fn (r/cursor state [:time-fn])
         hero (hero)
-        ;;        enemy (enemy)
+        enemy (enemy)
         font-atom (r/cursor state [:font])
-        ;;goal (goal font-atom "Goal")
-        ;;table (table 0 0)
         tables (set-stage (:stage @state))
         paused? (r/cursor state [:paused?])
         key-state (r/cursor state [:key-state])
-        key-state-tracker (r/cursor state [:key-state-tracker])]
-    ;;(.log js/console (clj->js tables))
+        key-state-tracker (r/cursor state [:key-state-tracker])
+        enemy-ticks (r/cursor state [:enemy-ticks])]
     (swap! state assoc
            :render-fn render-fn
            :hero hero
-           ;;           :goal goal
-           ;;           :enemy enemy
+           :enemy enemy
            :tables tables
-           :scene scene)
+           :scene scene
+           :camera camera)
     (.updateBox hero)
-    ;;    (.updateBox goal)
-    ;;    (.updateBox table)
-    ;;  (.updateBox enemy)
+    (.updateBox enemy)
     ($ scene add (.getObject3d hero))
     ($ scene add (.getBoxHelper hero))
+    ($ scene add (.getObject3d enemy))
     ($ scene add (origin))
-    (.moveTo hero 0 200)
+    (.moveTo hero 0 700)
+    (.moveTo enemy 1200 -500)
+    (reset! enemy-ticks 0)
     ;; (doall (mapv (fn [direction]
     ;;                ($ scene add direction))
     ;;              (allowed-directions hero)))
