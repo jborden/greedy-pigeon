@@ -1,0 +1,7 @@
+#!/bin/bash
+cp resources/public/index_release.html ~/jborden/ld38/index.html
+cp resources/public/js/greedy_pigeon.min.js ~/jborden/ld38/js/
+cp -r resources/public/images ~/jborden/ld38
+cp -r resources/public/css ~/jborden/ld38
+cp -r resources/public/fonts ~/jborden/ld38
+cp -r resources/public/audio ~/jborden/ld38

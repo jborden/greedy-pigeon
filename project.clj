@@ -3,6 +3,7 @@
   :url "http://example.com/FIXME"
   :dependencies [[org.clojure/clojure "1.8.0"]
                  [org.clojure/clojurescript "1.9.494"]
+                 [cljsjs/soundjs "0.6.2-0"]
                  [cljsjs/three "0.0.84-0"]
                  [reagent "0.6.1"]]
   :plugins [[lein-cljsbuild "1.1.5"]
