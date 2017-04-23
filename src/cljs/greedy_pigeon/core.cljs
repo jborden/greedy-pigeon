@@ -17,6 +17,9 @@
                     :init-game-won-fn (constantly true)
                     :init-title-screen-fn (constantly true)
                     :font nil
+                    :color-cycle [0xFF69B4 0x69FF83 0xF9FF69]
+                    :win-color 0xF9FF69
+                    :cycle-colors? false
                     :stage [[0 0 1 0 0]
                             [0 1 0 1 0]
                             [1 0 1 0 1]]})
@@ -142,12 +145,15 @@
         mesh (js/THREE.Mesh. geometry material)
         object3d ($ (js/THREE.Object3D.) add mesh)
         box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
-        bounding-box (js/THREE.Box3.)]
+        bounding-box (js/THREE.Box3.)
+        occupancy (atom 0)
+        visited (atom 0)]
     (reify
       Object
       (getObject3d [this] object3d)
       (getBoundingBox [this] bounding-box)
       (getBoxHelper [this] box-helper)
+      (getMaterial [this] material)
       (updateBox [this]
         ($ box-helper update object3d)
         ($ bounding-box setFromObject box-helper)
@@ -172,7 +178,21 @@
       (translate [this x y]
         ($ object3d translateX x)
         ($ object3d translateY y)
-        (.updateBox this)))))
+        (.updateBox this))
+      (incrementOccupancy [this]
+        (swap! occupancy inc))
+      (resetOccupancy [this]
+        (reset! occupancy 0))
+      (getOccupancy [this]
+        @occupancy)
+      (incrementVisited [this]
+        (swap! visited inc))
+      (getTimesVisited [this]
+        @visited)
+      (setColor [this new-color]
+        ($ material color.setHex new-color))
+      (getColor [this]
+        ($ material :color)))))
 
 (defn set-stage
   "Given a vector of vectors, return a vector of table in their proper places"
@@ -254,6 +274,11 @@
     ($ bounding-box setFromObject plane)
     bounding-box))
 
+(defn contains-point?
+  "Does object's bounding box contain point?"
+  [point object]
+  ($ (.getBoundingBox object) containsPoint point))
+
 (defn allowed-directions
   "Given the hero and the tables objects, determine which tables the hero can jump to"
   [hero tables]
@@ -284,14 +309,52 @@
                                              0)
         bottom-right-point (js/THREE.Vector3. (+ hero-x table-width)
                                               (- hero-y table-height)
-                                              0)
-        contains-point? (fn [point object]
-                          ($ (.getBoundingBox object) containsPoint point))]
+                                              0)]
     {:top-left (first (filter (partial contains-point? top-left-point) tables))
      :top-right (first (filter (partial contains-point? top-right-point) tables))
      :bottom-left (first (filter (partial contains-point? bottom-left-point) tables))
      :bottom-right (first (filter (partial contains-point? bottom-right-point) tables))}))
 
+(defn occupied-table
+  "Given a hero and tables, return the table the hero is currently occupying"
+  [hero tables]
+  (let [hero-x ($ (.getObject3d hero) :position.x)
+        hero-y ($ (.getObject3d hero) :position.y)]
+    (first (filter (partial contains-point? (js/THREE.Vector3. hero-x hero-y 0)) tables))))
+
+(defn reset-occupation!
+  "Given a hero and tables, increment the occpancy of the tables
+  that don't have the hero to 0,"
+  [hero tables]
+  (let [hero-x ($ (.getObject3d hero) :position.x)
+        hero-y ($ (.getObject3d hero) :position.y)
+        currently-occupied-table (occupied-table hero tables)
+        non-occupied-tables (filter #(not= currently-occupied-table %) tables)]
+    ;;(.log js/console currently-occupied-table)
+    (doall (map #(.resetOccupancy %) non-occupied-tables))
+    (.incrementOccupancy currently-occupied-table)
+    (when (= (.getOccupancy currently-occupied-table) 1)
+      (.incrementVisited currently-occupied-table))))
+
+(defn set-colors!
+  "Given the a col of table objects and the color cycle, set the tables to the proper colors"
+  [color-cycle cycle? tables]
+  (let [non-cycle-index (fn [value color-cycle]
+                          (if (> value (- (count color-cycle) 1))
+                            (- (count color-cycle) 1)
+                            value))
+        cycle-index (fn [value color-cycle]
+                      (mod value (count color-cycle)))
+        color-index (fn [value color-cycle cycle?]
+                      (if cycle?
+                        (cycle-index value color-cycle)
+                        (non-cycle-index value color-cycle)))]
+    (doall (map (fn [table] (.setColor table (color-cycle (color-index (.getTimesVisited table)
+                                                                       color-cycle
+                                                                       cycle?)))) tables))))
+(defn game-won?
+  [tables win-color]
+  )
 (defn game-won-fn
   []
   (menu/menu-screen
@@ -357,7 +420,9 @@
                                 ($ (.getObject3d (direction allowed-directions))
                                    :position.x)
                                 ($ (.getObject3d (direction allowed-directions))
-                                   :position.y))))]
+                                   :position.y))))
+        color-cycle (r/cursor state [:color-cycle])
+        cycle-colors? (r/cursor state [:cycle-colors?])]
     (fn [delta-t]
       (@render-fn)
       #_      (when (.intersectsBox @goal (.getBoundingBox @hero))
@@ -383,7 +448,11 @@
       ;; (.log js/console "y " ($ (.getObject3d @hero) :position.y))
       ;; chase hero
       ;;      (.chaseHero @enemy @hero 1.4)
-      
+      (reset-occupation! @hero @tables)
+      (set-colors! @color-cycle @cycle-colors? @tables)
+      ;;(.setColor (first @tables) 0xff0000)
+      ;;(.log js/console "color cycle " (clj->js @color-cycle))
+      ;;(.log js/console "tables " (clj->js @tables))
       ;; set the allowed directions
       (reset! hero-allowed-directions (allowed-directions @hero @tables))
       ;; move the hero when not paused
@@ -445,7 +514,6 @@
     ($ scene add (.getBoxHelper hero))
     ($ scene add (origin))
     (.moveTo hero 0 200)
-    (.log js/console (clj->js (allowed-directions hero tables)))
     ;; (doall (mapv (fn [direction]
     ;;                ($ scene add direction))
     ;;              (allowed-directions hero)))
@@ -453,6 +521,8 @@
     ;; ($ scene add (.getBoxHelper goal))
     ;; ($ scene add (.getObject3d table))
     ;; ($ scene add (.getBoxHelper table))
+    (doall (map (fn [table]
+                  (.setColor table (first (:color-cycle @state)))) tables))
     (doall (map (fn [table]
                   ;;(.log js/console (.getBoxHelper table))
                   ($ scene add (.getObject3d table))
