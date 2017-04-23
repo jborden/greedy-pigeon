@@ -28,14 +28,23 @@
                             [0 0 1 0 1 0 1 0 1 0 1 0 0]
                             [0 1 0 1 0 1 0 1 0 1 0 1 0]
                             [1 0 1 0 1 0 1 0 1 0 1 0 1]]
-                    :hop "Hop"})
+                    :hop "Hop"
+                    :table-texture nil
+                    :hero-texture nil
+                    :broom-texture nil
+                    :broom-offset 160
+                    :hero-offset 90})
 
 (defonce state (r/atom initial-state))
 
-(defn enemy
+(defn broom
   []
-  (let [geometry (js/THREE.PlaneGeometry. 60 60 1)
-        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0xFF0000}))
+  (let [texture @(r/cursor state [:broom-texture])
+        geometry (js/THREE.PlaneGeometry. 80 240 1)
+        material (js/THREE.MeshBasicMaterial.
+                  (clj->js {:map texture
+                            :side js/THREE.DoubleSide
+                            :transparent true}))
         mesh (js/THREE.Mesh. geometry material)
         object3d ($ (js/THREE.Object3D.) add mesh)
         box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
@@ -70,14 +79,19 @@
 
 (defn hero
   []
-  (let [geometry (js/THREE.PlaneGeometry. 60 60 1)
-        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0x0000FF}))
+  (let [texture @(r/cursor state [:hero-texture])
+        geometry (js/THREE.PlaneGeometry. 150 150 1)
+        material (js/THREE.MeshBasicMaterial.
+                  (clj->js {:map texture
+                            :side js/THREE.DoubleSide
+                            :transparent true}))
         mesh (js/THREE.Mesh. geometry material)
         object3d ($ (js/THREE.Object3D.) add mesh)
         box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
         bounding-box (js/THREE.Box3.)
         move-increment 5
-        _ ($! object3d :position.z 10)]
+        _ ($! object3d :position.z 10)
+        ]
     (reify
       Object
       (updateBox [this]
@@ -128,8 +142,12 @@
 
 (defn table
   []
-  (let [geometry (js/THREE.PlaneGeometry. 200 200 1)
-        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0xFFC0CB}))
+  (let [texture @(r/cursor state [:table-texture])
+        geometry (js/THREE.PlaneGeometry. 200 200 1)
+        material (js/THREE.MeshBasicMaterial. 
+                  (clj->js {:map texture
+                            :side js/THREE.DoubleSide
+                            :transparent true}))
         mesh (js/THREE.Mesh. geometry material)
         object3d ($ (js/THREE.Object3D.) add mesh)
         box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
@@ -148,7 +166,7 @@
         ;;($! box-helper :visible false)
         )
       (intersectsBox [this box]
-        ($ (.getBoundingBox this) intersectsBox box))
+        (boolean ($ (.getBoundingBox this) intersectsBox box)))
       (moveTo [this x y]
         (let [ ;; x-center (/ (- ($ bounding-box :max.x)
               ;;                ($ bounding-box :min.x))
@@ -268,7 +286,7 @@
   ($ (.getBoundingBox object) containsPoint point))
 
 (defn allowed-directions
-  "Given the hero and the tables objects, determine which tables the hero can jump to"
+  "Given the hero and the tables objects, determine which tables the hero can jump to. Figure in an additional y-offset"
   [hero tables]
   (let [table-width 200
         table-height 200
@@ -293,11 +311,21 @@
      :bottom-right (first (filter (partial contains-point? bottom-right-point) tables))}))
 
 (defn occupied-table
-  "Given a hero and tables, return the table the hero is currently occupying"
-  [hero tables]
-  (let [hero-x ($ (.getObject3d hero) :position.x)
-        hero-y ($ (.getObject3d hero) :position.y)]
-    (first (filter (partial contains-point? (js/THREE.Vector3. hero-x hero-y 0)) tables))))
+  "Given an object and the tables, return the table the object is currently occupying"
+  [object tables]
+  (let [object-x ($ (.getObject3d object) :position.x)
+        object-y ($ (.getObject3d object) :position.y)
+        object-z ($ (.getObject3d object) :position.z)
+        object-bbox (.getBoundingBox object)
+        this-bbox ($ object-bbox clone)]
+    ($ this-bbox translate (js/THREE.Vector3. 0 0 -10))
+    ;;(.log js/console object-bbox)
+    ;;(.log js/console (clj->js tables))
+    ;;(partial contains-point? (js/THREE.Vector3. object-x object-y 0))
+    (first (filter
+            #(.intersectsBox % this-bbox)
+            ;;(partial contains-point? (js/THREE.Vector3. object-x object-y 0))
+            tables))))
 
 (defn reset-occupation!
   "Given a hero and tables, increment the occpancy of the tables
@@ -378,7 +406,7 @@
   "The main game, as a fn of delta-t and state"
   []
   (let [hero (r/cursor state [:hero])
-        enemy (r/cursor state [:enemy])
+        broom (r/cursor state [:broom])
         ;;        goal (r/cursor state [:goal])
         tables (r/cursor state [:tables])
         render-fn (r/cursor state [:render-fn])
@@ -386,27 +414,30 @@
         paused? (r/cursor state [:paused?])
         key-state (r/cursor state [:key-state])
         ticks-max 20
-        enemy-ticks (r/cursor state [:enemy-ticks])
-        enemy-max-ticks 45
+        broom-ticks (r/cursor state [:broom-ticks])
+        broom-max-ticks 45
         p-ticks-counter (r/cursor state [:p-ticks-counter])
         up-ticks-counter (r/cursor state [:up-ticks-counter])
         right-ticks-counter (r/cursor state [:right-ticks-counter])
         down-ticks-counter (r/cursor state [:down-ticks-counter])
         left-ticks-counter (r/cursor state [:left-ticks-counter])
         hero-allowed-directions (r/cursor state [:hero-allowed-directions])
-        enemy-allowed-directions (r/cursor state [:enemy-allowed-directions])
+        broom-allowed-directions (r/cursor state [:broom-allowed-directions])
+        hero-offset (r/cursor state [:hero-offset])
+        broom-offset (r/cursor state [:broom-offset])
         move-hero! (fn [hero allowed-directions direction]
                      (when (direction allowed-directions)
                        (.moveTo hero
                                 ($ (.getObject3d (direction allowed-directions))
                                    :position.x)
-                                ($ (.getObject3d (direction allowed-directions))
-                                   :position.y))
+                                (+  ($ (.getObject3d (direction allowed-directions)) :position.y)
+                                    @hero-offset))
                        ($ js/createjs Sound.play (:hop @state))))
-        move-enemy! (fn [enemy table]
-                      (.moveTo enemy
+        move-broom! (fn [broom table]
+                      (.moveTo broom
                                ($ (.getObject3d table) :position.x)
-                               ($ (.getObject3d table) :position.y)))
+                               (+  ($ (.getObject3d table) :position.y)
+                                   @broom-offset)))
         color-cycle (r/cursor state [:color-cycle])
         cycle-colors? (r/cursor state [:cycle-colors?])
         win-color (r/cursor state [:win-color])]
@@ -414,7 +445,7 @@
       (@render-fn)
       #_      (when (.intersectsBox @goal (.getBoundingBox @hero))
                 (init-game-won-screen))
-      #_ (when (.intersectsBox @enemy (.getBoundingBox @hero))
+      #_ (when (.intersectsBox @broom (.getBoundingBox @hero))
            (init-game-lost-screen))
       ;; p-key is up, reset the delay
       (if (not (:p @key-state))
@@ -433,13 +464,13 @@
         (reset! right-ticks-counter 0))
 
       (reset-occupation! @hero @tables)
-      (set-colors! @color-cycle @cycle-colors? @tables)
+      ;; (set-colors! @color-cycle @cycle-colors? @tables)
       ;; is the game won?
       (if (game-won? @tables @win-color)
         (init-game-won-screen))
       ;; set the allowed directions
-      (reset! hero-allowed-directions (allowed-directions @hero @tables))
-      (reset! enemy-allowed-directions (allowed-directions @enemy @tables))
+      (reset! hero-allowed-directions (allowed-directions (occupied-table @hero @tables) @tables))
+      (reset! broom-allowed-directions (allowed-directions (occupied-table @broom @tables) @tables))
 
       ;; move the hero when not paused
       (when-not @paused?
@@ -453,16 +484,18 @@
                      (controls/delay-repeat ticks-max down-ticks-counter #(move-hero! @hero @hero-allowed-directions :bottom-left)))
           :right-fn (fn []
                       (controls/delay-repeat ticks-max right-ticks-counter #(move-hero! @hero @hero-allowed-directions :bottom-right)))})
-        ;; reset enemy ticks
-        (when (< @enemy-ticks enemy-max-ticks)
-          (swap! enemy-ticks inc))
-        ;; ;; move the enemy
-        (when (= @enemy-ticks enemy-max-ticks)
-          (let [table-options (filter (comp not nil?) (vals @enemy-allowed-directions))]
-            (move-enemy! @enemy (nth table-options (rand-int (count table-options))))
-            (reset! enemy-ticks 0)))
+        ;; reset broom ticks
+        (when (< @broom-ticks broom-max-ticks)
+          (swap! broom-ticks inc))
+        ;; ;; move the broom
+        (when (= @broom-ticks broom-max-ticks)
+          (let [table-options (filter (comp not nil?) (vals @broom-allowed-directions))]
+            (move-broom! @broom (nth table-options (rand-int (count table-options))))
+            (reset! broom-ticks 0)))
         ;; is the game lost?
-        (if ($ (.getBoundingBox @enemy) containsBox (.getBoundingBox @hero))
+        (if ;;($ (.getBoundingBox @broom) containsBox (.getBoundingBox @hero))
+            (= (occupied-table @hero @tables)
+               (occupied-table @broom @tables))
           (init-game-lost-screen)))
       ;; listen for the p-key depress
       (controls/key-down-handler
@@ -482,34 +515,40 @@
                  0.1
                  20000)
                 scene
-                [0 0 3200])
+                [0 0 2500])
         renderer (display/create-renderer)
         render-fn (display/render renderer scene camera)
         time-fn (r/cursor state [:time-fn])
         hero (hero)
-        enemy (enemy)
+        broom (broom)
         font-atom (r/cursor state [:font])
         tables (set-stage (:stage @state))
         paused? (r/cursor state [:paused?])
         key-state (r/cursor state [:key-state])
         key-state-tracker (r/cursor state [:key-state-tracker])
-        enemy-ticks (r/cursor state [:enemy-ticks])]
+        broom-ticks (r/cursor state [:broom-ticks])
+        broom-offset (r/cursor state [:broom-offset])
+        hero-offset (r/cursor state [:hero-offset])]
     (swap! state assoc
            :render-fn render-fn
            :hero hero
-           :enemy enemy
+           :broom broom
            :tables tables
            :scene scene
            :camera camera)
     (.updateBox hero)
-    (.updateBox enemy)
+    (.updateBox broom)
     ($ scene add (.getObject3d hero))
     ($ scene add (.getBoxHelper hero))
-    ($ scene add (.getObject3d enemy))
+    ($ scene add (.getObject3d broom))
     ($ scene add (origin))
-    (.moveTo hero 0 600)
-    (.moveTo enemy 1200 -600)
-    (reset! enemy-ticks 0)
+    ;;(.moveTo hero 0 690)
+    (.moveTo hero 0 ;;700
+             700
+             )
+    (.moveTo broom 1200 ;;-480
+             (+ -600 @broom-offset))
+    (reset! broom-ticks 0)
     ;; (doall (mapv (fn [direction]
     ;;                ($ scene add direction))
     ;;              (allowed-directions hero)))
@@ -517,8 +556,8 @@
     ;; ($ scene add (.getBoxHelper goal))
     ;; ($ scene add (.getObject3d table))
     ;; ($ scene add (.getBoxHelper table))
-    (doall (map (fn [table]
-                  (.setColor table (first (:color-cycle @state)))) tables))
+    ;; (doall (map (fn [table]
+    ;;               (.setColor table (first (:color-cycle @state)))) tables))
     (doall (map (fn [table]
                   ;;(.log js/console (.getBoxHelper table))
                   ($ scene add (.getObject3d table))
@@ -527,11 +566,11 @@
     ;; ($! tables :position.x 0)
     ;; ($! tables :position.y 0)
     ;; ($ scene add tables)
-    ;;    ($ scene add (.getObject3d enemy))
-    ;;    ($ scene add (.getBoxHelper enemy))
+    ;;    ($ scene add (.getObject3d broom))
+    ;;    ($ scene add (.getBoxHelper broom))
     ;;    (.moveTo goal 0 -300)
     ;;    (.moveTo table 0 -300)
-    ;;    (.moveTo enemy 50 400)
+    ;;    (.moveTo broom 50 400)
     (reset! time-fn (game-fn))
     (r/render
      [:div {:id "root-node"}
@@ -558,7 +597,13 @@
   []
   (let [font-url "fonts/helvetiker_regular.typeface.json"
         font-atom (r/cursor state [:font])
-        time-fn (r/cursor state [:time-fn])]
+        time-fn (r/cursor state [:time-fn])
+        table-texture (r/cursor state [:table-texture])
+        hero-texture (r/cursor state [:hero-texture])
+        broom-texture (r/cursor state [:broom-texture])]
+    (reset! table-texture (js/THREE.ImageUtils.loadTexture. "images/table_red.png"))
+    (reset! hero-texture (js/THREE.ImageUtils.loadTexture. "images/pigeon_right_a.png"))
+    (reset! broom-texture (js/THREE.ImageUtils.loadTexture. "images/broom.png"))
     (load-font! font-url font-atom)
     (load-sound!)
     (reset! time-fn (load-assets-fn))))
