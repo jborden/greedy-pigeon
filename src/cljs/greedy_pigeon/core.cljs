@@ -2,6 +2,7 @@
   (:require-macros [reagent.interop :refer [$ $!]])
   (:require [reagent.core :as r]
             [cljsjs.three]
+            [cljsjs.soundjs]
             [greedy-pigeon.components :refer [PauseComponent TitleScreen GameContainer GameWonScreen GameLostScreen]]
             [greedy-pigeon.controls :as controls]
             [greedy-pigeon.display :as display]
@@ -26,8 +27,8 @@
                             [0 0 0 1 0 1 0 1 0 1 0 0 0]
                             [0 0 1 0 1 0 1 0 1 0 1 0 0]
                             [0 1 0 1 0 1 0 1 0 1 0 1 0]
-                            [1 0 1 0 1 0 1 0 1 0 1 0 1]
-                            []]})
+                            [1 0 1 0 1 0 1 0 1 0 1 0 1]]
+                    :hop "Hop"})
 
 (defonce state (r/atom initial-state))
 
@@ -395,12 +396,13 @@
         hero-allowed-directions (r/cursor state [:hero-allowed-directions])
         enemy-allowed-directions (r/cursor state [:enemy-allowed-directions])
         move-hero! (fn [hero allowed-directions direction]
-                     (if (direction allowed-directions)
+                     (when (direction allowed-directions)
                        (.moveTo hero
                                 ($ (.getObject3d (direction allowed-directions))
                                    :position.x)
                                 ($ (.getObject3d (direction allowed-directions))
-                                   :position.y))))
+                                   :position.y))
+                       ($ js/createjs Sound.play (:hop @state))))
         move-enemy! (fn [enemy table]
                       (.moveTo enemy
                                ($ (.getObject3d table) :position.x)
@@ -505,8 +507,8 @@
     ($ scene add (.getBoxHelper hero))
     ($ scene add (.getObject3d enemy))
     ($ scene add (origin))
-    (.moveTo hero 0 700)
-    (.moveTo enemy 1200 -500)
+    (.moveTo hero 0 600)
+    (.moveTo enemy 1200 -600)
     (reset! enemy-ticks 0)
     ;; (doall (mapv (fn [direction]
     ;;                ($ scene add direction))
@@ -541,6 +543,10 @@
                                    (reset! paused? false))}]]
      ($ js/document getElementById "reagent-app"))))
 
+(defn load-sound!
+  []
+  ($ js/createjs Sound.registerSound "audio/bounce.mp3" (:hop @state)))
+
 (defn load-assets-fn
   []
   (let [font (r/cursor state [:font])]
@@ -554,7 +560,9 @@
         font-atom (r/cursor state [:font])
         time-fn (r/cursor state [:time-fn])]
     (load-font! font-url font-atom)
+    (load-sound!)
     (reset! time-fn (load-assets-fn))))
+
 
 (defn title-screen-fn
   []
