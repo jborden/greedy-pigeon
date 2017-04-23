@@ -192,7 +192,7 @@
       (setColor [this new-color]
         ($ material color.setHex new-color))
       (getColor [this]
-        ($ material :color)))))
+        ($ material color.getHex)))))
 
 (defn set-stage
   "Given a vector of vectors, return a vector of table in their proper places"
@@ -354,7 +354,8 @@
                                                                        cycle?)))) tables))))
 (defn game-won?
   [tables win-color]
-  )
+  (every? true? (map #(= (.getColor %) win-color) tables)))
+
 (defn game-won-fn
   []
   (menu/menu-screen
@@ -422,7 +423,8 @@
                                 ($ (.getObject3d (direction allowed-directions))
                                    :position.y))))
         color-cycle (r/cursor state [:color-cycle])
-        cycle-colors? (r/cursor state [:cycle-colors?])]
+        cycle-colors? (r/cursor state [:cycle-colors?])
+        win-color (r/cursor state [:win-color])]
     (fn [delta-t]
       (@render-fn)
       #_      (when (.intersectsBox @goal (.getBoundingBox @hero))
@@ -450,6 +452,8 @@
       ;;      (.chaseHero @enemy @hero 1.4)
       (reset-occupation! @hero @tables)
       (set-colors! @color-cycle @cycle-colors? @tables)
+      (if (game-won? @tables @win-color)
+        (init-game-won-screen))
       ;;(.setColor (first @tables) 0xff0000)
       ;;(.log js/console "color cycle " (clj->js @color-cycle))
       ;;(.log js/console "tables " (clj->js @tables))
