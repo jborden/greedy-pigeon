@@ -1,4 +1,5 @@
 #!/bin/bash
+lein cljsbuild once release
 cp resources/public/index_release.html ~/jborden/ld38/index.html
 cp resources/public/js/greedy_pigeon.min.js ~/jborden/ld38/js/
 cp -r resources/public/images ~/jborden/ld38
