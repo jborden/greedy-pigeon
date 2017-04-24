@@ -695,6 +695,8 @@
         key-state (r/cursor state [:key-state])
         key-state-tracker (r/cursor state [:key-state-tracker])
         broom-ticks (r/cursor state [:broom-ticks])
+        shadow-ticks (r/cursor state [:shadow-ticks])
+        boot-ticks (r/cursor state [:boot-ticks])
         broom-offset (r/cursor state [:broom-offset])
         boot-offset (r/cursor state [:boot-offset])
         hero-offset (r/cursor state [:hero-offset])
@@ -732,6 +734,8 @@
     (.moveTo shadow 0
              (+ 600 @(r/cursor state [:shadow-offset])))
     (reset! broom-ticks 0)
+    (reset! shadow-ticks 0)
+    (reset! boot-ticks 0)
     (doall (map (fn [table]
                   ;;(.log js/console (.getBoxHelper table))
                   ($ scene add (.getObject3d table))
