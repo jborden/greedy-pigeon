@@ -19,14 +19,16 @@
                     :selected-menu-item "start"
                     :time-fn (constantly true)
                     :init-game (constantly true)
-                    :init-game-won-fn (constantly true)
+                    :init-play-again-fn (constantly true)
                     :init-title-screen-fn (constantly true)
                     :font nil
                     :table-cycle ;; ["none" "coins-small" "coins-big" "poop-small" "poop-medium" "poop-big"]
-                    ["none" "coins-small" "coins-big"]
-                    :win-con "coins-big"
+                    nil
+                    ;;["none" "coins-small" "coins-big"]
+                    :win-con ;;"coins-big"
+                    nil
                     ;; "poop-big"
-                    :cycle-colors? false
+                    :cycle? false
                     :stage
                     [[0 0 0 0 0 0 1 0 0 0 0 0 0]
                      [0 0 0 0 0 1 0 1 0 0 0 0 0]
@@ -64,9 +66,43 @@
                     :change-to-text nil
                     :change-to-table nil
                     :change-to-decoration nil
-                    })
+                    :background-overlay nil
+                    :current-stage nil})
 
 (defonce state (r/atom initial-state))
+
+(def stages
+  [{:table-cycle ["none" "coins-small"]
+    :win-con "coins-small"
+    :cycle? false}
+   {:table-cycle ["none" "coins-small" "coins-big"]
+    :win-con "coins-big"
+    :cycle? false}
+   {:table-cycle ["none" "poop-small"]
+    :win-con "poop-small"
+    :cycle? true}])
+
+(defn set-stage!
+  [n]
+  (let [table-cycle (r/cursor state [:table-cycle])
+        win-con (r/cursor state [:win-con])
+        cycle? (r/cursor state [:cycle?])
+        current-stage (r/cursor state [:current-stage])
+        stage (nth stages n)]
+    (.log js/console "stage " (clj->js stage))
+    (reset! current-stage n)
+    (reset! table-cycle (:table-cycle stage))
+    (reset! win-con (:win-con stage))
+    (reset! cycle? (:cycle? stage))))
+
+(defn next-stage
+  []
+  (let [current-stage (r/cursor state [:current-stage])
+        next-stage (+ @current-stage 1)]
+    (if (> next-stage (- (count stages) 1))
+      0
+      next-stage)))
+
 
 (defn broom
   []
@@ -305,6 +341,8 @@
         (swap! visited inc))
       (getTimesVisited [this]
         @visited)
+      (resetVisited [this]
+        (reset! visited 0))
       (getDecoration [this]
         @decoration)
       (setDecoration [this name]
@@ -346,7 +384,7 @@
           ($! object3d :position.y y)
           (.updateBox this))))))
 
-(defn set-stage
+(defn set-tables
   "Given a vector of vectors, return a vector of table in their proper places"
   [m]
   (let [table-width 200
@@ -539,11 +577,11 @@
             (filter (comp not nil?)
              (doall (map set-decoration! tables))))))
 
-(defn game-won?
+(defn stage-won?
   [tables win-con]
   (every? true? (map #(= (.getDecoration %) win-con) tables)))
 
-(defn game-won-fn
+(defn play-again-fn
   []
   (menu/menu-screen
    state
@@ -566,7 +604,7 @@
         selected-menu-item (r/cursor state [:selected-menu-item])]
     (reset! key-state (:key-state initial-state))
     (reset! selected-menu-item "play-again")
-    (reset! time-fn (game-won-fn))
+    (reset! time-fn (play-again-fn))
     (r/render
      [GameWonScreen {:selected-menu-item selected-menu-item}]
      ($ js/document getElementById "reagent-app"))))
@@ -579,7 +617,7 @@
         selected-menu-item (r/cursor state [:selected-menu-item])]
     (reset! key-state (:key-state initial-state))
     (reset! selected-menu-item "play-again")
-    (reset! time-fn (game-won-fn))
+    (reset! time-fn (play-again-fn))
     (r/render
      [GameLostScreen {:selected-menu-item selected-menu-item}]
      ($ js/document getElementById "reagent-app"))))
@@ -644,6 +682,88 @@
     (.moveTo @score-text -1200 700)
     ($ @scene add (.getObject3d @score-text))))
 
+(defn init-stage
+  [state]
+  (let [scene (r/cursor state [:scene])
+        hero (r/cursor state [:hero])
+        broom (r/cursor state [:broom])
+        boot (r/cursor state [:boot])
+        shadow (r/cursor state [:shadow])
+        font-atom (r/cursor state [:font])
+        tables (r/cursor state [:tables])
+        paused? (r/cursor state [:paused?])
+        died? (r/cursor state [:died?])
+        died-ticks (r/cursor state [:died-ticks])
+        key-state (r/cursor state [:key-state])
+        key-state-tracker (r/cursor state [:key-state-tracker])
+        broom-ticks (r/cursor state [:broom-ticks])
+        shadow-ticks (r/cursor state [:shadow-ticks])
+        boot-ticks (r/cursor state [:boot-ticks])
+        broom-offset (r/cursor state [:broom-offset])
+        boot-offset (r/cursor state [:boot-offset])
+        hero-offset (r/cursor state [:hero-offset])
+        table-decorations (r/cursor state [:table-decorations])
+        lives (r/cursor state [:lives])
+        score (r/cursor state [:score])
+        score-text (r/cursor state [:score-text])
+        change-to-text (r/cursor state [:change-to-text])
+        change-to-table (r/cursor state [:change-to-table])
+        change-to-decoration (r/cursor state [:change-to-decoration])
+        win-con (r/cursor state [:win-con])]
+    ;; reset the key-state
+    (reset! key-state (:key-state initial-state))
+    ;; update the hero, broom and boot boxes
+    (.updateBox @hero)
+    (.updateBox @broom)
+    (.updateBox @boot)
+    ;; move the hero to the proper place
+    (.moveTo @hero 0 700)
+    ;; move the broom to the proper place
+    (.moveTo @broom
+             1200 ;;-480
+             ;;(+ -600 @broom-offset)
+             10000
+             )
+    ;; the shadow needs to be move to the proper place
+    ($! (.getObject3d @shadow) :position.z 9)
+    (.moveTo @shadow 0
+             (+ 600 @(r/cursor state [:shadow-offset])))
+    ;; move the boot to the proper place
+    (.moveTo @boot
+             0
+             10000)
+    ;; set the ticks properly
+    (reset! broom-ticks 0)
+    (reset! shadow-ticks 0)
+    (reset! boot-ticks 0)
+    (reset! died-ticks 0)
+    ;; set the total score
+    ;; do this later
+    ;; make sure we aren't dead
+    (reset! died? false)
+    ;; show our lives total
+    (show-lives! state)
+    ;; show the current score
+    (reset-score! state @score)
+    ;; show the change to menu text
+    ;; (reset! change-to-text (text font-atom "Tables be like"))
+    ;; (.moveTo @change-to-text -1200 350)
+    ;; ($ scene add (.getObject3d @change-to-text))
+    ;; show the change to menu table
+    (reset! change-to-table (table))
+    (.moveTo @change-to-table -1000 200)
+    ($ @scene add (.getObject3d @change-to-table))
+    ;; set the decorations to win-con
+    (.setDecoration @change-to-table @win-con)
+    ;; show the change to decoration
+    (reset! change-to-decoration (set-decoration! @change-to-table))
+    ;; initialize table
+    (doall (map #(.setDecoration % (first (:table-cycle @state))) @tables))
+    (doall (map #(.log js/console (.getDecoration %)) @tables))
+    (doall (map #(.resetVisited %) @tables))
+    ;; add the new ones in
+    (set-decorations! @tables @table-decorations state)))
+
 (defn game-fn
   "The main game, as a fn of delta-t and state"
   []
@@ -687,6 +807,8 @@
                                    :position.x)
                                 (+  ($ (.getObject3d (direction allowed-directions)) :position.y)
                                     @hero-offset))
+   ;;                    (.log js/console (count @table-decorations))
+ ;;                      (doall (map #(.log js/console (.getDecoration %)) @tables))
                        ;; redraw the table decorations
                        (set-decorations! @tables @table-decorations state)
                        ;; reset the score
@@ -699,10 +821,11 @@
                                (+  ($ (.getObject3d table) :position.y)
                                    @broom-offset)))
         table-cycle (r/cursor state [:table-cycle])
-        cycle-colors? (r/cursor state [:cycle-colors?])
+        cycle? (r/cursor state [:cycle?])
         win-con (r/cursor state [:win-con])
         lives (r/cursor state [:lives])
-        died? (r/cursor state [:died?])]
+        died? (r/cursor state [:died?])
+        current-stage (r/cursor state [:current-stage])]
     (fn [delta-t]
       (@render-fn)
       ;; p-key is up, reset the delay
@@ -722,13 +845,19 @@
         (reset! right-ticks-counter 0))
       ;; set the tables occupation and decorations
       (reset-occupation! @hero @tables)
-      (set-decorations-cycle! @table-cycle @cycle-colors? @tables)
-      ;; is the game won?
-      (if (game-won? @tables @win-con)
-        (init-game-won-screen))
+      (set-decorations-cycle! @table-cycle @cycle? @tables)
+      ;; is the stage won?
+      (when (stage-won? @tables @win-con)
+        (.log js/console "I think I won")
+        (.log js/console "current-stage is: " @current-stage)
+        ;; set to the next stage
+        (set-stage! (next-stage))
+        ;; reinitialize the stage
+        ;;(init-game-won-screen)
+        (init-stage state))
       ;; set the allowed directions
       (reset! hero-allowed-directions (allowed-directions (occupied-table @hero @tables) @tables))
-      (reset! broom-allowed-directions (allowed-directions (occupied-table @broom @tables) @tables))
+      ;;(reset! broom-allowed-directions (allowed-directions (occupied-table @broom @tables) @tables))
       ;; pause the game momentarily when you die
       (when (and @died? (not @paused?))
         (swap! died-ticks inc))
@@ -813,6 +942,7 @@
        {:p-fn (fn [] (controls/delay-repeat ticks-max p-ticks-counter
                                             #(reset! paused? (not @paused?))))}))))
 
+
 (defn ^:export init-game
   "Function to setup and start the game"
   []
@@ -833,7 +963,7 @@
         broom (broom)
         boot (boot)
         font-atom (r/cursor state [:font])
-        tables (set-stage (:stage @state))
+        tables (set-tables (:stage @state))
         paused? (r/cursor state [:paused?])
         died? (r/cursor state [:died?])
         died-ticks (r/cursor state [:died-ticks])
@@ -853,7 +983,10 @@
         change-to-text (r/cursor state [:change-to-text])
         change-to-table (r/cursor state [:change-to-table])
         change-to-decoration (r/cursor state [:change-to-decoration])
-        win-con (r/cursor state [:win-con])]
+        win-con (r/cursor state [:win-con])
+        table-cycle (r/cursor state [:table-cycle])
+        win-con (r/cursor state [:win-con])
+        cycle? (r/cursor state [:cycle?])]
     (swap! state assoc
            :render-fn render-fn
            :hero hero
@@ -871,50 +1004,58 @@
     ($ scene add (.getObject3d broom))
     ($ scene add (.getObject3d boot))
     ($ scene add (.getObject3d shadow))
-    ($! (.getObject3d shadow) :position.z 9)
+    ;; ($! (.getObject3d shadow) :position.z 9)
     ($ scene add (origin))
-    (reset! lives 3)
+    (reset! lives 0)
     ;;(.moveTo hero 0 690)
-    (.moveTo hero 0 ;;700
-             700
-             )
-    (.moveTo broom
-             1200 ;;-480
-             (+ -600 @broom-offset))
-    (.moveTo boot
-             0
-             10000)
-    (.moveTo shadow 0
-             (+ 600 @(r/cursor state [:shadow-offset])))
-    (reset! broom-ticks 0)
-    (reset! shadow-ticks 0)
-    (reset! boot-ticks 0)
-    (reset! died-ticks 0)
-    (reset! score (calculate-score state))
-    (reset! died? false)
+    ;; (.moveTo hero 0 ;;700
+    ;;          700
+    ;;          )
+    ;; (.moveTo broom
+    ;;          1200 ;;-480
+    ;;          (+ -600 @broom-offset))
+    ;; (.moveTo boot
+    ;;          0
+    ;;          10000)
+    ;; (.moveTo shadow 0
+    ;;          (+ 600 @(r/cursor state [:shadow-offset])))
+    ;; (reset! broom-ticks 0)
+    ;; (reset! shadow-ticks 0)
+    ;; (reset! boot-ticks 0)
+    ;; (reset! died-ticks 0)
+    ;;    (reset! score (calculate-score state))
+    ;; score is initiall 0
+    (reset! score 0)
+    ;;    (reset! died? false)
+    ;; add the tables to the scene
     (doall (map (fn [table]
                   ($ scene add (.getObject3d table))) tables))
+    ;; show lives total
     (show-lives! state)
-    ;; show the score
+    ;; set the score text
     (reset! score-text (text font-atom @score))
-    (.moveTo @score-text -1200 700)
-    ($ scene add (.getObject3d @score-text))
+    ;; (.moveTo @score-text -1200 700)
+    ;; ($ scene add (.getObject3d @score-text))
     ;; show the change to menu text
-    (reset! change-to-text (text font-atom "Tables be like"))
-    (.moveTo @change-to-text -1200 350)
+    (reset! change-to-text (text font-atom "Change To"))
+    (.moveTo @change-to-text -1190 350)
     ($ scene add (.getObject3d @change-to-text))
     ;; show the change to menu table
-    (reset! change-to-table (table))
-    (.moveTo @change-to-table -1000 200)
-    ($ scene add (.getObject3d @change-to-table))
+    ;; (reset! change-to-table (table))
+    ;; (.moveTo @change-to-table -1000 200)
+    ;; ($ scene add (.getObject3d @change-to-table))
     ;; set the decoration to win-con
-    (.setDecoration @change-to-table @win-con)
+    ;;(.setDecoration @change-to-table @win-con)
     ;; show the change to decoration
-    (reset! change-to-decoration (set-decoration! @change-to-table))
+    ;; (reset! change-to-decoration (set-decoration! @change-to-table))
     ;; initial table decorations
-    (doall (map #(.setDecoration % (first (:table-cycle @state))) tables))
-    (set-decorations! tables @table-decorations state)
+    ;; (doall (map #(.setDecoration % (first (:table-cycle @state))) tables))
+    ;; (set-decorations! tables @table-decorations state)
     (reset! time-fn (game-fn))
+    ;; set the proper stage
+    (set-stage! 0)
+    (init-stage state)
+    (display/window-resize! renderer camera)
     (r/render
      [:div {:id "root-node"}
       [GameContainer {:renderer renderer
@@ -950,7 +1091,7 @@
         poop-medium-texture (r/cursor state [:poop-medium-texture])
         poop-big-texture (r/cursor state [:poop-big-texture])
         boot-texture (r/cursor state [:boot-texture])
-;;        shadow-grey-texture (r/cursor state [:shadow-grey-texture])
+        ;;        shadow-grey-texture (r/cursor state [:shadow-grey-texture])
         shadow-black-texture (r/cursor state [:shadow-black-texture])]
     (reset! table-texture (js/THREE.ImageUtils.loadTexture. "images/table_red.png"))
     (reset! hero-texture (js/THREE.ImageUtils.loadTexture. "images/pigeon_right_a.png"))
@@ -960,7 +1101,7 @@
     (reset! poop-small-texture (js/THREE.ImageUtils.loadTexture. "images/poop_small.png"))
     (reset! poop-medium-texture (js/THREE.ImageUtils.loadTexture. "images/poop_medium.png"))
     (reset! poop-big-texture (js/THREE.ImageUtils.loadTexture. "images/poop_big.png"))
-;;    (reset! shadow-grey-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_grey.png"))
+    ;;    (reset! shadow-grey-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_grey.png"))
     (reset! shadow-black-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_black.png"))
     (reset! boot-texture (js/THREE.ImageUtils.loadTexture. "images/boot_a.png"))
     (load-font! font-url font-atom)
@@ -1005,7 +1146,7 @@
   (let [time-fn (r/cursor state [:time-fn])
         init-game-fn (r/cursor state [:init-game])
         key-state (r/cursor state [:key-state])
-        init-game-won-fn (r/cursor state [:init-game-won-fn])
+        init-play-again-fn (r/cursor state [:init-play-again-fn])
         init-title-screen-fn (r/cursor state [:init-title-screen-fn])]
     ;; start controls listeners
     (controls/initialize-key-listeners! key-state)
