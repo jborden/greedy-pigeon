@@ -61,6 +61,9 @@
                     :lives-symbols nil
                     :score nil
                     :score-text nil
+                    :change-to-text nil
+                    :change-to-table nil
+                    :change-to-decoration nil
                     })
 
 (defonce state (r/atom initial-state))
@@ -503,6 +506,25 @@
                                                                                  table-cycle
                                                                                  cycle?)))) tables))))
 
+(defn set-decoration!
+  "Set the appropriate decoration on a table"
+  [table]
+  (let [table-x ($ (.getObject3d table) :position.x)
+        table-y ($ (.getObject3d table) :position.y)
+        scene (r/cursor state [:scene])
+        decoration-name (.getDecoration table)
+        table-decoration (condp = decoration-name
+                           "none" nil
+                           "coins-small" (coins-small-decoration)
+                           "coins-big" (coins-big-decoration)
+                           "poop-small" (poop-small-decoration)
+                           "poop-medium" (poop-medium-decoration)
+                           "poop-big" (poop-big-decoration))]
+    (when (not (nil? table-decoration))
+      (.moveTo table-decoration table-x (+ table-y 50))
+      ($ @scene add (.getObject3d table-decoration)))
+    table-decoration))
+
 (defn set-decorations!
   "Given the tables and current table-decorations, reset the table decorations"
   [tables table-decorations state]
@@ -515,21 +537,7 @@
     ;; table decorations to the scene
     (reset! (r/cursor state [:table-decorations])
             (filter (comp not nil?)
-             (doall (map (fn [table]
-                           (let [table-x ($ (.getObject3d table) :position.x)
-                                 table-y ($ (.getObject3d table) :position.y)
-                                 decoration-name (.getDecoration table)
-                                 table-decoration (condp = decoration-name
-                                                    "none" nil
-                                                    "coins-small" (coins-small-decoration)
-                                                    "coins-big" (coins-big-decoration)
-                                                    "poop-small" (poop-small-decoration)
-                                                    "poop-medium" (poop-medium-decoration)
-                                                    "poop-big" (poop-big-decoration))]
-                             (when (not (nil? table-decoration))
-                               (.moveTo table-decoration table-x (+ table-y 50))
-                               ($ scene add (.getObject3d table-decoration)))
-                             table-decoration)) tables))))))
+             (doall (map set-decoration! tables))))))
 
 (defn game-won?
   [tables win-con]
@@ -841,7 +849,11 @@
         shadow (table-decoration @(r/cursor state [:shadow-black-texture]) 130 22)
         lives (r/cursor state [:lives])
         score (r/cursor state [:score])
-        score-text (r/cursor state [:score-text])]
+        score-text (r/cursor state [:score-text])
+        change-to-text (r/cursor state [:change-to-text])
+        change-to-table (r/cursor state [:change-to-table])
+        change-to-decoration (r/cursor state [:change-to-decoration])
+        win-con (r/cursor state [:win-con])]
     (swap! state assoc
            :render-fn render-fn
            :hero hero
@@ -883,9 +895,22 @@
     (doall (map (fn [table]
                   ($ scene add (.getObject3d table))) tables))
     (show-lives! state)
+    ;; show the score
     (reset! score-text (text font-atom @score))
     (.moveTo @score-text -1200 700)
     ($ scene add (.getObject3d @score-text))
+    ;; show the change to menu text
+    (reset! change-to-text (text font-atom "Tables be like"))
+    (.moveTo @change-to-text -1200 350)
+    ($ scene add (.getObject3d @change-to-text))
+    ;; show the change to menu table
+    (reset! change-to-table (table))
+    (.moveTo @change-to-table -1000 200)
+    ($ scene add (.getObject3d @change-to-table))
+    ;; set the decoration to win-con
+    (.setDecoration @change-to-table @win-con)
+    ;; show the change to decoration
+    (reset! change-to-decoration (set-decoration! @change-to-table))
     ;; initial table decorations
     (doall (map #(.setDecoration % (first (:table-cycle @state))) tables))
     (set-decorations! tables @table-decorations state)
