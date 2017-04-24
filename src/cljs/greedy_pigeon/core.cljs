@@ -59,6 +59,8 @@
                     :shadow-ticks nil
                     :shadow-offset 50
                     :lives-symbols nil
+                    :score nil
+                    :score-text nil
                     })
 
 (defonce state (r/atom initial-state))
@@ -329,15 +331,16 @@
       (intersectsBox [this box]
         ($ (.getBoundingBox this) intersectsBox box))
       (moveTo [this x y]
-        (let [x-center (/ (- ($ bounding-box :max.x)
-                             ($ bounding-box :min.x))
-                          2)
-              y-center (/
-                        (- ($ bounding-box :max.y)
-                           ($ bounding-box :min.y))
-                        2)]
-          ($! object3d :position.x (- x x-center))
-          ($! object3d :position.y (- y y-center))
+        (let [;; x-center (/ (- ($ bounding-box :max.x)
+              ;;                ($ bounding-box :min.x))
+              ;;             2)
+              ;; y-center (/
+              ;;           (- ($ bounding-box :max.y)
+              ;;              ($ bounding-box :min.y))
+              ;;           2)
+              ]
+          ($! object3d :position.x x)
+          ($! object3d :position.y y)
           (.updateBox this))))))
 
 (defn set-stage
@@ -585,7 +588,7 @@
     ;; move the symbols to the proper place
     (doall (map-indexed (fn [idx pigeon]
                           ($ @scene add (.getObject3d pigeon))
-                          (.moveTo pigeon (+ -1200 (* idx 150)) 700))
+                          (.moveTo pigeon (+ 1200 (* idx -150)) 700))
                         @lives-symbols))))
 
 (defn shadow-chase-hero!
@@ -610,6 +613,28 @@
     (reset! boot-ticks 0)
     (.moveTo @shadow 0 10000)
     (.moveTo @boot 0 10000)))
+
+(defn calculate-score
+  "calculate score"
+  [state]
+  (let [table-cycle (r/cursor state [:table-cycle])
+        tables (r/cursor state [:tables])
+        score (atom 0)]
+    (apply + (map-indexed (fn [idx itm]
+                            (* idx (count (filter #(= (.getDecoration %)
+                                                      itm) @tables)))) @table-cycle))))
+(defn reset-score!
+  "reset the score and redraw its value"
+  [state new-score]
+  (let [score (r/cursor state [:score])
+        score-text (r/cursor state [:score-text])
+        scene (r/cursor state [:scene])
+        font-atom (r/cursor state [:font])]
+    (reset! score new-score)
+    ($ @scene remove (.getObject3d @score-text))
+    (reset! score-text (text font-atom @score))
+    (.moveTo @score-text -1200 700)
+    ($ @scene add (.getObject3d @score-text))))
 
 (defn game-fn
   "The main game, as a fn of delta-t and state"
@@ -656,6 +681,9 @@
                                     @hero-offset))
                        ;; redraw the table decorations
                        (set-decorations! @tables @table-decorations state)
+                       ;; reset the score
+                       (reset-score! state (calculate-score state))
+                       ;; redraw the score
                        ($ js/createjs Sound.play (:hop @state))))
         move-broom! (fn [broom table]
                       (.moveTo broom
@@ -730,10 +758,10 @@
         (when (< @broom-ticks broom-max-ticks)
           (swap! broom-ticks inc))
         ;; ;; move the broom
-        (when (= @broom-ticks broom-max-ticks)
-          (let [table-options (filter (comp not nil?) (vals @broom-allowed-directions))]
-            (move-broom! @broom (nth table-options (rand-int (count table-options))))
-            (reset! broom-ticks 0)))
+        ;; (when (= @broom-ticks broom-max-ticks)
+        ;;   (let [table-options (filter (comp not nil?) (vals @broom-allowed-directions))]
+        ;;     (move-broom! @broom (nth table-options (rand-int (count table-options))))
+        ;;     (reset! broom-ticks 0)))
         ;; reset shadow ticks
         (when (< @shadow-ticks shadow-ticks-max)
           (swap! shadow-ticks inc))
@@ -745,13 +773,13 @@
         (when (< @boot-ticks boot-ticks-max)
           (swap! boot-ticks inc))
         ;; move the boot to where the shadow is
-        (when (= @boot-ticks boot-ticks-max)
-          (let [shadow-table (occupied-table @shadow @tables)]
-            (if (not (nil? shadow-table))
-              (let [table-x ($ (.getObject3d shadow-table) :position.x)
-                    table-y ($ (.getObject3d shadow-table) :position.y)]
-                (.moveTo @boot table-x (+ table-y @boot-offset))
-                (reset! boot-ticks 0)))))
+        ;; (when (= @boot-ticks boot-ticks-max)
+        ;;   (let [shadow-table (occupied-table @shadow @tables)]
+        ;;     (if (not (nil? shadow-table))
+        ;;       (let [table-x ($ (.getObject3d shadow-table) :position.x)
+        ;;             table-y ($ (.getObject3d shadow-table) :position.y)]
+        ;;         (.moveTo @boot table-x (+ table-y @boot-offset))
+        ;;         (reset! boot-ticks 0)))))
         ;; is the game lost?
         (when (= (occupied-table @hero @tables)
                  (occupied-table @broom @tables))
@@ -811,7 +839,9 @@
         hero-offset (r/cursor state [:hero-offset])
         table-decorations (r/cursor state [:table-decorations])
         shadow (table-decoration @(r/cursor state [:shadow-black-texture]) 130 22)
-        lives (r/cursor state [:lives])]
+        lives (r/cursor state [:lives])
+        score (r/cursor state [:score])
+        score-text (r/cursor state [:score-text])]
     (swap! state assoc
            :render-fn render-fn
            :hero hero
@@ -848,11 +878,14 @@
     (reset! shadow-ticks 0)
     (reset! boot-ticks 0)
     (reset! died-ticks 0)
+    (reset! score (calculate-score state))
     (reset! died? false)
     (doall (map (fn [table]
                   ($ scene add (.getObject3d table))) tables))
-    ;; ($ scene add (js/THREE.BoxHelper. tables))
     (show-lives! state)
+    (reset! score-text (text font-atom @score))
+    (.moveTo @score-text -1200 700)
+    ($ scene add (.getObject3d @score-text))
     ;; initial table decorations
     (doall (map #(.setDecoration % (first (:table-cycle @state))) tables))
     (set-decorations! tables @table-decorations state)
