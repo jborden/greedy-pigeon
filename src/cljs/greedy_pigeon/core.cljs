@@ -18,8 +18,10 @@
                     :init-game-won-fn (constantly true)
                     :init-title-screen-fn (constantly true)
                     :font nil
-                    :color-cycle [0xFF69B4 0x69FF83 0xF9FF69]
-                    :win-color 0xF9FF69
+                    :table-cycle ;; ["none" "coins-small" "coins-big" "poop-small" "poop-medium" "poop-big"]
+                    ["none" "coins-small" "coins-big"]
+                    :win-con "coins-big"
+                    ;; "poop-big"
                     :cycle-colors? false
                     :stage [[0 0 0 0 0 0 1 0 0 0 0 0 0]
                             [0 0 0 0 0 1 0 1 0 0 0 0 0]
@@ -32,8 +34,15 @@
                     :table-texture nil
                     :hero-texture nil
                     :broom-texture nil
+                    :coins-small-texture nil
+                    :coins-big-texture nil
+                    :poop-small-texture nil
+                    :poop-medium-texture nil
+                    :poop-big-texture nil
+                    :table-decorations nil
                     :broom-offset 160
-                    :hero-offset 90})
+                    :hero-offset 90
+                    })
 
 (defonce state (r/atom initial-state))
 
@@ -140,6 +149,47 @@
      (fn [font]
        (reset! font-atom font))))
 
+(defn table-decoration
+  [texture height width]
+  (let [geometry (js/THREE.PlaneGeometry. height width 1)
+        material (js/THREE.MeshBasicMaterial.
+                  (clj->js {:map texture
+                            :side js/THREE.DoubleSide
+                            :transparent true}))
+        mesh (js/THREE.Mesh. geometry material)
+        object3d ($ (js/THREE.Object3D.) add mesh)]
+    (reify
+      Object
+      (getObject3d [this] object3d)
+      (moveTo [this x y]
+        ($! object3d :position.x x)
+        ($! object3d :position.y y)))))
+
+(defn coins-small-decoration
+  []
+  (table-decoration (:coins-small-texture @state)
+                    120 60))
+
+(defn coins-big-decoration
+  []
+  (table-decoration (:coins-big-texture @state)
+                    120 60))
+
+(defn poop-small-decoration
+  []
+  (table-decoration (:poop-small-texture @state)
+                    120 60))
+
+(defn poop-medium-decoration
+  []
+  (table-decoration (:poop-medium-texture @state)
+                    120 60))
+
+(defn poop-big-decoration
+  []
+  (table-decoration (:poop-big-texture @state)
+                    120 60))
+
 (defn table
   []
   (let [texture @(r/cursor state [:table-texture])
@@ -153,7 +203,8 @@
         box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
         bounding-box (js/THREE.Box3.)
         occupancy (atom 0)
-        visited (atom 0)]
+        visited (atom 0)
+        decoration (atom nil)]
     (reify
       Object
       (getObject3d [this] object3d)
@@ -168,19 +219,9 @@
       (intersectsBox [this box]
         (boolean ($ (.getBoundingBox this) intersectsBox box)))
       (moveTo [this x y]
-        (let [ ;; x-center (/ (- ($ bounding-box :max.x)
-              ;;                ($ bounding-box :min.x))
-              ;;             2)
-              ;; y-center (/
-              ;;           (- ($ bounding-box :max.y)
-              ;;              ($ bounding-box :min.y))
-              ;;           2)
-              ]
-          ;; ($! object3d :position.x (- x x-center))
-          ;; ($! object3d :position.y (- y y-center))
-          ($! object3d :position.x x)
-          ($! object3d :position.y y)
-          (.updateBox this)))
+        ($! object3d :position.x x)
+        ($! object3d :position.y y)
+        (.updateBox this))
       (translate [this x y]
         ($ object3d translateX x)
         ($ object3d translateY y)
@@ -195,10 +236,10 @@
         (swap! visited inc))
       (getTimesVisited [this]
         @visited)
-      (setColor [this new-color]
-        ($ material color.setHex new-color))
-      (getColor [this]
-        ($ material color.getHex)))))
+      (getDecoration [this]
+        @decoration)
+      (setDecoration [this name]
+        (reset! decoration name)))))
 
 (defn set-stage
   "Given a vector of vectors, return a vector of table in their proper places"
@@ -318,7 +359,8 @@
         object-z ($ (.getObject3d object) :position.z)
         object-bbox (.getBoundingBox object)
         this-bbox ($ object-bbox clone)]
-    ($ this-bbox translate (js/THREE.Vector3. 0 0 -10))
+    ;; because the tables lay within the z-plane
+    ($ this-bbox translate (js/THREE.Vector3. 0 0 (- object-z)))
     ;;(.log js/console object-bbox)
     ;;(.log js/console (clj->js tables))
     ;;(partial contains-point? (js/THREE.Vector3. object-x object-y 0))
@@ -341,25 +383,55 @@
     (when (= (.getOccupancy currently-occupied-table) 1)
       (.incrementVisited currently-occupied-table))))
 
-(defn set-colors!
-  "Given the a col of table objects and the color cycle, set the tables to the proper colors"
-  [color-cycle cycle? tables]
-  (let [non-cycle-index (fn [value color-cycle]
-                          (if (> value (- (count color-cycle) 1))
-                            (- (count color-cycle) 1)
+
+(defn set-decorations-cycle!
+  "Given the a col of table objects and the table cycle, set the tables to the proper cycle"
+  [table-cycle cycle? tables]
+  (let [non-cycle-index (fn [value table-cycle]
+                          (if (> value (- (count table-cycle) 1))
+                            (- (count table-cycle) 1)
                             value))
-        cycle-index (fn [value color-cycle]
-                      (mod value (count color-cycle)))
-        color-index (fn [value color-cycle cycle?]
-                      (if cycle?
-                        (cycle-index value color-cycle)
-                        (non-cycle-index value color-cycle)))]
-    (doall (map (fn [table] (.setColor table (color-cycle (color-index (.getTimesVisited table)
-                                                                       color-cycle
-                                                                       cycle?)))) tables))))
+        cycle-index (fn [value table-cycle]
+                      (mod value (count table-cycle)))
+        decoration-index (fn [value table-cycle cycle?]
+                           (if cycle?
+                             (cycle-index value table-cycle)
+                             (non-cycle-index value table-cycle)))]
+    (doall (map (fn [table] (.setDecoration table (table-cycle (decoration-index (.getTimesVisited table)
+                                                                                 table-cycle
+                                                                                 cycle?)))) tables))))
+
+(defn set-decorations!
+  "Given the tables and current table-decorations, reset the table decorations"
+  [tables table-decorations state]
+  (let [scene @(r/cursor state [:scene])]
+;;    (.log js/console (clj->js table-decorations))
+    ;; remove any table-decorations from the scene
+    (when (not (empty? table-decorations))
+      (doall (map #($ scene remove (.getObject3d %)) table-decorations)))
+    ;; reset the table-decorations atom and add the
+    ;; table decorations to the scene
+    (reset! (r/cursor state [:table-decorations])
+            (filter (comp not nil?)
+             (doall (map (fn [table]
+                           (let [table-x ($ (.getObject3d table) :position.x)
+                                 table-y ($ (.getObject3d table) :position.y)
+                                 decoration-name (.getDecoration table)
+                                 table-decoration (condp = decoration-name
+                                                    "none" nil
+                                                    "coins-small" (coins-small-decoration)
+                                                    "coins-big" (coins-big-decoration)
+                                                    "poop-small" (poop-small-decoration)
+                                                    "poop-medium" (poop-medium-decoration)
+                                                    "poop-big" (poop-big-decoration))]
+                             (when (not (nil? table-decoration))
+                               (.moveTo table-decoration table-x (+ table-y 50))
+                               ($ scene add (.getObject3d table-decoration)))
+                             table-decoration)) tables))))))
+
 (defn game-won?
-  [tables win-color]
-  (every? true? (map #(= (.getColor %) win-color) tables)))
+  [tables win-con]
+  (every? true? (map #(= (.getDecoration %) win-con) tables)))
 
 (defn game-won-fn
   []
@@ -409,6 +481,7 @@
         broom (r/cursor state [:broom])
         ;;        goal (r/cursor state [:goal])
         tables (r/cursor state [:tables])
+        table-decorations (r/cursor state [:table-decorations])
         render-fn (r/cursor state [:render-fn])
         key-state (r/cursor state [:key-state])
         paused? (r/cursor state [:paused?])
@@ -427,20 +500,23 @@
         broom-offset (r/cursor state [:broom-offset])
         move-hero! (fn [hero allowed-directions direction]
                      (when (direction allowed-directions)
+                       ;; move hero
                        (.moveTo hero
                                 ($ (.getObject3d (direction allowed-directions))
                                    :position.x)
                                 (+  ($ (.getObject3d (direction allowed-directions)) :position.y)
                                     @hero-offset))
+                       ;; redraw the table decorations
+                       (set-decorations! @tables @table-decorations state)
                        ($ js/createjs Sound.play (:hop @state))))
         move-broom! (fn [broom table]
                       (.moveTo broom
                                ($ (.getObject3d table) :position.x)
                                (+  ($ (.getObject3d table) :position.y)
                                    @broom-offset)))
-        color-cycle (r/cursor state [:color-cycle])
+        table-cycle (r/cursor state [:table-cycle])
         cycle-colors? (r/cursor state [:cycle-colors?])
-        win-color (r/cursor state [:win-color])]
+        win-con (r/cursor state [:win-con])]
     (fn [delta-t]
       (@render-fn)
       #_      (when (.intersectsBox @goal (.getBoundingBox @hero))
@@ -462,11 +538,12 @@
       (if (and (not (:right-arrow @key-state))
                (not (:d @key-state)))
         (reset! right-ticks-counter 0))
-
+      ;; set the tables occupation and decorations
       (reset-occupation! @hero @tables)
-      ;; (set-colors! @color-cycle @cycle-colors? @tables)
+      (set-decorations-cycle! @table-cycle @cycle-colors? @tables)
+      ;;
       ;; is the game won?
-      (if (game-won? @tables @win-color)
+      (if (game-won? @tables @win-con)
         (init-game-won-screen))
       ;; set the allowed directions
       (reset! hero-allowed-directions (allowed-directions (occupied-table @hero @tables) @tables))
@@ -496,7 +573,7 @@
         (if ;;($ (.getBoundingBox @broom) containsBox (.getBoundingBox @hero))
             (= (occupied-table @hero @tables)
                (occupied-table @broom @tables))
-          (init-game-lost-screen)))
+            (init-game-lost-screen)))
       ;; listen for the p-key depress
       (controls/key-down-handler
        @key-state
@@ -528,7 +605,8 @@
         key-state-tracker (r/cursor state [:key-state-tracker])
         broom-ticks (r/cursor state [:broom-ticks])
         broom-offset (r/cursor state [:broom-offset])
-        hero-offset (r/cursor state [:hero-offset])]
+        hero-offset (r/cursor state [:hero-offset])
+        table-decorations (r/cursor state [:table-decorations])]
     (swap! state assoc
            :render-fn render-fn
            :hero hero
@@ -539,7 +617,7 @@
     (.updateBox hero)
     (.updateBox broom)
     ($ scene add (.getObject3d hero))
-    ($ scene add (.getBoxHelper hero))
+;;;    ($ scene add (.getBoxHelper hero))
     ($ scene add (.getObject3d broom))
     ($ scene add (origin))
     ;;(.moveTo hero 0 690)
@@ -549,28 +627,15 @@
     (.moveTo broom 1200 ;;-480
              (+ -600 @broom-offset))
     (reset! broom-ticks 0)
-    ;; (doall (mapv (fn [direction]
-    ;;                ($ scene add direction))
-    ;;              (allowed-directions hero)))
-    ;; ($ scene add (.getObject3d goal))
-    ;; ($ scene add (.getBoxHelper goal))
-    ;; ($ scene add (.getObject3d table))
-    ;; ($ scene add (.getBoxHelper table))
-    ;; (doall (map (fn [table]
-    ;;               (.setColor table (first (:color-cycle @state)))) tables))
     (doall (map (fn [table]
                   ;;(.log js/console (.getBoxHelper table))
                   ($ scene add (.getObject3d table))
-                  ($ scene add (.getBoxHelper table))) tables))
+                  ;;            ($ scene add (.getBoxHelper table))
+                  ) tables))
     ;; ($ scene add (js/THREE.BoxHelper. tables))
-    ;; ($! tables :position.x 0)
-    ;; ($! tables :position.y 0)
-    ;; ($ scene add tables)
-    ;;    ($ scene add (.getObject3d broom))
-    ;;    ($ scene add (.getBoxHelper broom))
-    ;;    (.moveTo goal 0 -300)
-    ;;    (.moveTo table 0 -300)
-    ;;    (.moveTo broom 50 400)
+    ;; initial table decorations
+    (doall (map #(.setDecoration % (first (:table-cycle @state))) tables))
+    (set-decorations! tables @table-decorations state)
     (reset! time-fn (game-fn))
     (r/render
      [:div {:id "root-node"}
@@ -600,10 +665,20 @@
         time-fn (r/cursor state [:time-fn])
         table-texture (r/cursor state [:table-texture])
         hero-texture (r/cursor state [:hero-texture])
-        broom-texture (r/cursor state [:broom-texture])]
+        broom-texture (r/cursor state [:broom-texture])
+        coins-small-texture (r/cursor state [:coins-small-texture])
+        coins-big-texture (r/cursor state [:coins-big-texture])
+        poop-small-texture (r/cursor state [:poop-small-texture])
+        poop-medium-texture (r/cursor state [:poop-medium-texture])
+        poop-big-texture (r/cursor state [:poop-big-texture])]
     (reset! table-texture (js/THREE.ImageUtils.loadTexture. "images/table_red.png"))
     (reset! hero-texture (js/THREE.ImageUtils.loadTexture. "images/pigeon_right_a.png"))
     (reset! broom-texture (js/THREE.ImageUtils.loadTexture. "images/broom.png"))
+    (reset! coins-small-texture (js/THREE.ImageUtils.loadTexture. "images/coins_small.png"))
+    (reset! coins-big-texture (js/THREE.ImageUtils.loadTexture. "images/coins_big.png"))
+    (reset! poop-small-texture (js/THREE.ImageUtils.loadTexture. "images/poop_small.png"))
+    (reset! poop-medium-texture (js/THREE.ImageUtils.loadTexture. "images/poop_medium.png"))
+    (reset! poop-big-texture (js/THREE.ImageUtils.loadTexture. "images/poop_big.png"))
     (load-font! font-url font-atom)
     (load-sound!)
     (reset! time-fn (load-assets-fn))))
