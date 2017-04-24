@@ -23,13 +23,16 @@
                     :win-con "coins-big"
                     ;; "poop-big"
                     :cycle-colors? false
-                    :stage [[0 0 0 0 0 0 1 0 0 0 0 0 0]
-                            [0 0 0 0 0 1 0 1 0 0 0 0 0]
-                            [0 0 0 0 1 0 1 0 1 0 0 0 0]
-                            [0 0 0 1 0 1 0 1 0 1 0 0 0]
-                            [0 0 1 0 1 0 1 0 1 0 1 0 0]
-                            [0 1 0 1 0 1 0 1 0 1 0 1 0]
-                            [1 0 1 0 1 0 1 0 1 0 1 0 1]]
+                    :stage
+                    [[0 0 0 0 0 0 1 0 0 0 0 0 0]
+                     [0 0 0 0 0 1 0 1 0 0 0 0 0]
+                     [0 0 0 0 1 0 1 0 1 0 0 0 0]
+                     [0 0 0 1 0 1 0 1 0 1 0 0 0]
+                     [0 0 1 0 1 0 1 0 1 0 1 0 0]
+                     [0 1 0 1 0 1 0 1 0 1 0 1 0]
+                     [1 0 1 0 1 0 1 0 1 0 1 0 1]]
+                    :table-height 200
+                    :table-width 200
                     :hop "Hop"
                     :table-texture nil
                     :hero-texture nil
@@ -39,9 +42,17 @@
                     :poop-small-texture nil
                     :poop-medium-texture nil
                     :poop-big-texture nil
+                    :shadow-grey-texture nil
+                    :shadow-black-texture nil
+                    :boot-texture nil
                     :table-decorations nil
                     :broom-offset 160
                     :hero-offset 90
+                    :boot-offset 120
+                    :lives 3
+                    :boot-ticks nil
+                    :shadow-ticks nil
+                    :shadow-offset 50
                     })
 
 (defonce state (r/atom initial-state))
@@ -50,6 +61,46 @@
   []
   (let [texture @(r/cursor state [:broom-texture])
         geometry (js/THREE.PlaneGeometry. 80 240 1)
+        material (js/THREE.MeshBasicMaterial.
+                  (clj->js {:map texture
+                            :side js/THREE.DoubleSide
+                            :transparent true}))
+        mesh (js/THREE.Mesh. geometry material)
+        object3d ($ (js/THREE.Object3D.) add mesh)
+        box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
+        bounding-box (js/THREE.Box3.)
+        move-increment 5
+        _ ($! object3d :position.z 10)]
+    (reify
+      Object
+      (updateBox [this]
+        ($ box-helper update object3d)
+        ($ bounding-box setFromObject box-helper))
+      (moveLeft [this]
+        ($ object3d translateX (- move-increment))
+        (.updateBox this))
+      (moveRight [this]
+        ($ object3d translateX move-increment)
+        (.updateBox this))
+      (moveUp [this]
+        ($ object3d translateY move-increment)
+        (.updateBox this))
+      (moveDown [this]
+        ($ object3d translateY (- move-increment))
+        (.updateBox this))
+      (moveTo [this x y]
+        (do
+          ($! object3d :position.x x)
+          ($! object3d :position.y y)
+          (.updateBox this)))
+      (getObject3d [this] object3d)
+      (getBoundingBox [this] bounding-box)
+      (getBoxHelper [this] box-helper))))
+
+(defn boot
+  []
+  (let [texture @(r/cursor state [:boot-texture])
+        geometry (js/THREE.PlaneGeometry. 140 160 1)
         material (js/THREE.MeshBasicMaterial.
                   (clj->js {:map texture
                             :side js/THREE.DoubleSide
@@ -157,13 +208,20 @@
                             :side js/THREE.DoubleSide
                             :transparent true}))
         mesh (js/THREE.Mesh. geometry material)
-        object3d ($ (js/THREE.Object3D.) add mesh)]
+        object3d ($ (js/THREE.Object3D.) add mesh)
+        box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
+        bounding-box (js/THREE.Box3.)]
     (reify
       Object
+      (updateBox [this]
+        ($ box-helper update object3d)
+        ($ bounding-box setFromObject box-helper))
       (getObject3d [this] object3d)
+      (getBoundingBox [this] bounding-box)
       (moveTo [this x y]
         ($! object3d :position.x x)
-        ($! object3d :position.y y)))))
+        ($! object3d :position.y y)
+        (.updateBox this)))))
 
 (defn coins-small-decoration
   []
@@ -193,7 +251,7 @@
 (defn table
   []
   (let [texture @(r/cursor state [:table-texture])
-        geometry (js/THREE.PlaneGeometry. 200 200 1)
+        geometry (js/THREE.PlaneGeometry. @(r/cursor state [:table-width]) @(r/cursor state [:table-height]) 1)
         material (js/THREE.MeshBasicMaterial. 
                   (clj->js {:map texture
                             :side js/THREE.DoubleSide
@@ -489,6 +547,12 @@
         ticks-max 20
         broom-ticks (r/cursor state [:broom-ticks])
         broom-max-ticks 45
+        shadow-ticks-max 100
+        shadow-ticks (r/cursor state [:shadow-ticks])
+        shadow (r/cursor state [:shadow])
+        boot (r/cursor state [:boot])
+        boot-ticks-max 99
+        boot-ticks (r/cursor state [:boot-ticks])
         p-ticks-counter (r/cursor state [:p-ticks-counter])
         up-ticks-counter (r/cursor state [:up-ticks-counter])
         right-ticks-counter (r/cursor state [:right-ticks-counter])
@@ -498,6 +562,8 @@
         broom-allowed-directions (r/cursor state [:broom-allowed-directions])
         hero-offset (r/cursor state [:hero-offset])
         broom-offset (r/cursor state [:broom-offset])
+        boot-offset (r/cursor state [:boot-offset])
+        shadow-offset (r/cursor state [:shadow-offset])
         move-hero! (fn [hero allowed-directions direction]
                      (when (direction allowed-directions)
                        ;; move hero
@@ -569,11 +635,35 @@
           (let [table-options (filter (comp not nil?) (vals @broom-allowed-directions))]
             (move-broom! @broom (nth table-options (rand-int (count table-options))))
             (reset! broom-ticks 0)))
+        ;; reset shadow ticks
+        (when (< @shadow-ticks shadow-ticks-max)
+          (swap! shadow-ticks inc))
+        ;; move the shadow to where the hero is
+        (when (= @shadow-ticks shadow-ticks-max)
+          (let [hero-table (occupied-table @hero @tables)
+                table-x ($ (.getObject3d hero-table) :position.x)
+                table-y ($ (.getObject3d hero-table) :position.y)]
+            (.moveTo @shadow table-x (+ table-y @shadow-offset))
+            (reset! shadow-ticks 0)))
+        ;; reset boot ticks
+        (when (< @boot-ticks boot-ticks-max)
+          (swap! boot-ticks inc))
+        ;; move the boot to where the shadow is
+        (when (= @boot-ticks boot-ticks-max)
+          (let [shadow-table (occupied-table @shadow @tables)]
+            (if (not (nil? shadow-table))
+              (let [table-x ($ (.getObject3d shadow-table) :position.x)
+                    table-y ($ (.getObject3d shadow-table) :position.y)]
+                (.moveTo @boot table-x (+ table-y @boot-offset))
+                (reset! boot-ticks 0)))))
         ;; is the game lost?
-        (if ;;($ (.getBoundingBox @broom) containsBox (.getBoundingBox @hero))
-            (= (occupied-table @hero @tables)
+        (if (= (occupied-table @hero @tables)
                (occupied-table @broom @tables))
-            (init-game-lost-screen)))
+          (init-game-lost-screen))
+        (if (= (occupied-table @hero @tables)
+               (occupied-table @boot @tables))
+          (init-game-lost-screen))
+        )
       ;; listen for the p-key depress
       (controls/key-down-handler
        @key-state
@@ -598,6 +688,7 @@
         time-fn (r/cursor state [:time-fn])
         hero (hero)
         broom (broom)
+        boot (boot)
         font-atom (r/cursor state [:font])
         tables (set-stage (:stage @state))
         paused? (r/cursor state [:paused?])
@@ -605,27 +696,41 @@
         key-state-tracker (r/cursor state [:key-state-tracker])
         broom-ticks (r/cursor state [:broom-ticks])
         broom-offset (r/cursor state [:broom-offset])
+        boot-offset (r/cursor state [:boot-offset])
         hero-offset (r/cursor state [:hero-offset])
-        table-decorations (r/cursor state [:table-decorations])]
+        table-decorations (r/cursor state [:table-decorations])
+        shadow (table-decoration @(r/cursor state [:shadow-black-texture]) 130 22)]
     (swap! state assoc
            :render-fn render-fn
            :hero hero
            :broom broom
+           :boot boot
            :tables tables
+           :shadow shadow
            :scene scene
            :camera camera)
     (.updateBox hero)
     (.updateBox broom)
+    (.updateBox boot)
     ($ scene add (.getObject3d hero))
 ;;;    ($ scene add (.getBoxHelper hero))
     ($ scene add (.getObject3d broom))
+    ($ scene add (.getObject3d boot))
+    ($ scene add (.getObject3d shadow))
+    ($! (.getObject3d shadow) :position.z 9)
     ($ scene add (origin))
     ;;(.moveTo hero 0 690)
     (.moveTo hero 0 ;;700
              700
              )
-    (.moveTo broom 1200 ;;-480
+    (.moveTo broom
+             1200 ;;-480
              (+ -600 @broom-offset))
+    (.moveTo boot
+             0
+             10000)
+    (.moveTo shadow 0
+             (+ 600 @(r/cursor state [:shadow-offset])))
     (reset! broom-ticks 0)
     (doall (map (fn [table]
                   ;;(.log js/console (.getBoxHelper table))
@@ -670,7 +775,10 @@
         coins-big-texture (r/cursor state [:coins-big-texture])
         poop-small-texture (r/cursor state [:poop-small-texture])
         poop-medium-texture (r/cursor state [:poop-medium-texture])
-        poop-big-texture (r/cursor state [:poop-big-texture])]
+        poop-big-texture (r/cursor state [:poop-big-texture])
+        boot-texture (r/cursor state [:boot-texture])
+;;        shadow-grey-texture (r/cursor state [:shadow-grey-texture])
+        shadow-black-texture (r/cursor state [:shadow-black-texture])]
     (reset! table-texture (js/THREE.ImageUtils.loadTexture. "images/table_red.png"))
     (reset! hero-texture (js/THREE.ImageUtils.loadTexture. "images/pigeon_right_a.png"))
     (reset! broom-texture (js/THREE.ImageUtils.loadTexture. "images/broom.png"))
@@ -679,6 +787,9 @@
     (reset! poop-small-texture (js/THREE.ImageUtils.loadTexture. "images/poop_small.png"))
     (reset! poop-medium-texture (js/THREE.ImageUtils.loadTexture. "images/poop_medium.png"))
     (reset! poop-big-texture (js/THREE.ImageUtils.loadTexture. "images/poop_big.png"))
+;;    (reset! shadow-grey-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_grey.png"))
+    (reset! shadow-black-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_black.png"))
+    (reset! boot-texture (js/THREE.ImageUtils.loadTexture. "images/boot_a.png"))
     (load-font! font-url font-atom)
     (load-sound!)
     (reset! time-fn (load-assets-fn))))
