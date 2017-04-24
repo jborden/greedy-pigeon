@@ -11,6 +11,10 @@
             [greedy-pigeon.utilities :as utilities]))
 
 (def initial-state {:paused? false
+                    :died? false
+                    :died-broom? false
+                    :died-boot? false
+                    :died-ticks nil
                     :key-state {}
                     :selected-menu-item "start"
                     :time-fn (constantly true)
@@ -49,10 +53,12 @@
                     :broom-offset 160
                     :hero-offset 90
                     :boot-offset 120
-                    :lives 3
+                    :broom-delay 100
+                    :lives nil
                     :boot-ticks nil
                     :shadow-ticks nil
                     :shadow-offset 50
+                    :lives-symbols nil
                     })
 
 (defonce state (r/atom initial-state))
@@ -137,7 +143,7 @@
       (getBoundingBox [this] bounding-box)
       (getBoxHelper [this] box-helper))))
 
-(defn hero
+(defn pigeon
   []
   (let [texture @(r/cursor state [:hero-texture])
         geometry (js/THREE.PlaneGeometry. 150 150 1)
@@ -298,6 +304,41 @@
         @decoration)
       (setDecoration [this name]
         (reset! decoration name)))))
+
+(defn text
+  [font-atom text]
+  (let [geometry (js/THREE.TextGeometry. text
+                                         (clj->js {:font @font-atom
+                                                   :size 50
+                                                   :height 10}))
+        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0xD4AF37}))
+        mesh (js/THREE.Mesh. geometry material)
+        object3d ($ (js/THREE.Object3D.) add mesh)
+        box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
+        bounding-box (js/THREE.Box3.)]
+    (reify
+      Object
+      (getObject3d [this] object3d)
+      (getBoundingBox [this] bounding-box)
+      (getBoxHelper [this] box-helper)
+      (updateBox [this]
+        ($ box-helper update object3d)
+        ($ bounding-box setFromObject box-helper)
+        ;;($! box-helper :visible false)
+        )
+      (intersectsBox [this box]
+        ($ (.getBoundingBox this) intersectsBox box))
+      (moveTo [this x y]
+        (let [x-center (/ (- ($ bounding-box :max.x)
+                             ($ bounding-box :min.x))
+                          2)
+              y-center (/
+                        (- ($ bounding-box :max.y)
+                           ($ bounding-box :min.y))
+                        2)]
+          ($! object3d :position.x (- x x-center))
+          ($! object3d :position.y (- y y-center))
+          (.updateBox this))))))
 
 (defn set-stage
   "Given a vector of vectors, return a vector of table in their proper places"
@@ -532,21 +573,62 @@
      [GameLostScreen {:selected-menu-item selected-menu-item}]
      ($ js/document getElementById "reagent-app"))))
 
+(defn show-lives!
+  [state]
+  (let [lives-symbols (r/cursor state [:lives-symbols])
+        lives (r/cursor state [:lives])
+        scene (r/cursor state [:scene])]
+    ;; remove any symbols that are present
+    (doall (map #($ @scene remove (.getObject3d %)) @lives-symbols))
+    ;; create the symbols
+    (reset! lives-symbols (take @lives (repeatedly pigeon)))
+    ;; move the symbols to the proper place
+    (doall (map-indexed (fn [idx pigeon]
+                          ($ @scene add (.getObject3d pigeon))
+                          (.moveTo pigeon (+ -1200 (* idx 150)) 700))
+                        @lives-symbols))))
+
+(defn shadow-chase-hero!
+  [state]
+  (let [hero (r/cursor state [:hero])
+        tables (r/cursor state [:tables])
+        shadow (r/cursor state [:shadow])
+        shadow-offset (r/cursor state [:shadow-offset])
+        hero-table (occupied-table @hero @tables)
+        table-x ($ (.getObject3d hero-table) :position.x)
+        table-y ($ (.getObject3d hero-table) :position.y)]
+    (.moveTo @shadow table-x (+ table-y @shadow-offset))))
+
+(defn reset-boot!
+  [state]
+  (let [boot (r/cursor state [:boot])
+        boot-ticks (r/cursor state [:boot-ticks])
+        shadow (r/cursor state [:shadow])
+        shadow-ticks (r/cursor state [:shadow-ticks])
+        hero (r/cursor state [:hero])]
+    (reset! shadow-ticks 0)
+    (reset! boot-ticks 0)
+    (.moveTo @shadow 0 10000)
+    (.moveTo @boot 0 10000)))
+
 (defn game-fn
   "The main game, as a fn of delta-t and state"
   []
   (let [hero (r/cursor state [:hero])
         broom (r/cursor state [:broom])
-        ;;        goal (r/cursor state [:goal])
         tables (r/cursor state [:tables])
         table-decorations (r/cursor state [:table-decorations])
         render-fn (r/cursor state [:render-fn])
         key-state (r/cursor state [:key-state])
         paused? (r/cursor state [:paused?])
+        died? (r/cursor state [:died?])
+        died-ticks (r/cursor state [:died-ticks])
+        died-ticks-max 100
         key-state (r/cursor state [:key-state])
         ticks-max 20
         broom-ticks (r/cursor state [:broom-ticks])
         broom-max-ticks 45
+        broom-delay (r/cursor state [:broom-delay])
         shadow-ticks-max 100
         shadow-ticks (r/cursor state [:shadow-ticks])
         shadow (r/cursor state [:shadow])
@@ -582,13 +664,11 @@
                                    @broom-offset)))
         table-cycle (r/cursor state [:table-cycle])
         cycle-colors? (r/cursor state [:cycle-colors?])
-        win-con (r/cursor state [:win-con])]
+        win-con (r/cursor state [:win-con])
+        lives (r/cursor state [:lives])
+        died? (r/cursor state [:died?])]
     (fn [delta-t]
       (@render-fn)
-      #_      (when (.intersectsBox @goal (.getBoundingBox @hero))
-                (init-game-won-screen))
-      #_ (when (.intersectsBox @broom (.getBoundingBox @hero))
-           (init-game-lost-screen))
       ;; p-key is up, reset the delay
       (if (not (:p @key-state))
         (reset! p-ticks-counter 0))
@@ -607,16 +687,35 @@
       ;; set the tables occupation and decorations
       (reset-occupation! @hero @tables)
       (set-decorations-cycle! @table-cycle @cycle-colors? @tables)
-      ;;
       ;; is the game won?
       (if (game-won? @tables @win-con)
         (init-game-won-screen))
       ;; set the allowed directions
       (reset! hero-allowed-directions (allowed-directions (occupied-table @hero @tables) @tables))
       (reset! broom-allowed-directions (allowed-directions (occupied-table @broom @tables) @tables))
-
+      ;; pause the game momentarily when you die
+      (when (and @died? (not @paused?))
+        (swap! died-ticks inc))
+      ;; restart the game after died-ticks-max
+      (when (and (= @died-ticks died-ticks-max)
+                 (not @paused?))
+        ;; move the hero away from the broom
+        (when (= (occupied-table @hero @tables)
+                 (occupied-table @broom @tables))
+          (let [table-options (filter (comp not nil?) (vals @broom-allowed-directions))]
+            (.moveTo @hero
+                     ($ (.getObject3d (first table-options))
+                        :position.x)
+                     (+  ($ (.getObject3d (first table-options))
+                            :position.y)
+                         @hero-offset))))
+        (reset! broom-ticks 0)
+        (reset-boot! state)
+        (shadow-chase-hero! state)
+        (reset! died? false)
+        (reset! died-ticks 0))
       ;; move the hero when not paused
-      (when-not @paused?
+      (when-not (or @paused? @died?)
         (controls/key-down-handler
          @key-state
          {:up-fn (fn []
@@ -640,11 +739,8 @@
           (swap! shadow-ticks inc))
         ;; move the shadow to where the hero is
         (when (= @shadow-ticks shadow-ticks-max)
-          (let [hero-table (occupied-table @hero @tables)
-                table-x ($ (.getObject3d hero-table) :position.x)
-                table-y ($ (.getObject3d hero-table) :position.y)]
-            (.moveTo @shadow table-x (+ table-y @shadow-offset))
-            (reset! shadow-ticks 0)))
+          (shadow-chase-hero! state)
+          (reset! shadow-ticks 0))
         ;; reset boot ticks
         (when (< @boot-ticks boot-ticks-max)
           (swap! boot-ticks inc))
@@ -657,13 +753,24 @@
                 (.moveTo @boot table-x (+ table-y @boot-offset))
                 (reset! boot-ticks 0)))))
         ;; is the game lost?
-        (if (= (occupied-table @hero @tables)
-               (occupied-table @broom @tables))
-          (init-game-lost-screen))
-        (if (= (occupied-table @hero @tables)
-               (occupied-table @boot @tables))
-          (init-game-lost-screen))
-        )
+        (when (= (occupied-table @hero @tables)
+                 (occupied-table @broom @tables))
+          (when (= @lives 0)
+            (reset! died? true)
+            (init-game-lost-screen))
+          (when (> @lives 0)
+            (swap! lives dec)
+            (show-lives! state)
+            (reset! died? true)))
+        (when (= (occupied-table @hero @tables)
+                 (occupied-table @boot @tables))
+          (when (= @lives 0)
+            (reset! died? true)
+            (init-game-lost-screen))
+          (when (> @lives 0)
+            (swap! lives dec)
+            (show-lives! state)
+            (reset! died? true))))
       ;; listen for the p-key depress
       (controls/key-down-handler
        @key-state
@@ -686,12 +793,14 @@
         renderer (display/create-renderer)
         render-fn (display/render renderer scene camera)
         time-fn (r/cursor state [:time-fn])
-        hero (hero)
+        hero (pigeon)
         broom (broom)
         boot (boot)
         font-atom (r/cursor state [:font])
         tables (set-stage (:stage @state))
         paused? (r/cursor state [:paused?])
+        died? (r/cursor state [:died?])
+        died-ticks (r/cursor state [:died-ticks])
         key-state (r/cursor state [:key-state])
         key-state-tracker (r/cursor state [:key-state-tracker])
         broom-ticks (r/cursor state [:broom-ticks])
@@ -701,7 +810,8 @@
         boot-offset (r/cursor state [:boot-offset])
         hero-offset (r/cursor state [:hero-offset])
         table-decorations (r/cursor state [:table-decorations])
-        shadow (table-decoration @(r/cursor state [:shadow-black-texture]) 130 22)]
+        shadow (table-decoration @(r/cursor state [:shadow-black-texture]) 130 22)
+        lives (r/cursor state [:lives])]
     (swap! state assoc
            :render-fn render-fn
            :hero hero
@@ -721,6 +831,7 @@
     ($ scene add (.getObject3d shadow))
     ($! (.getObject3d shadow) :position.z 9)
     ($ scene add (origin))
+    (reset! lives 3)
     ;;(.moveTo hero 0 690)
     (.moveTo hero 0 ;;700
              700
@@ -736,12 +847,12 @@
     (reset! broom-ticks 0)
     (reset! shadow-ticks 0)
     (reset! boot-ticks 0)
+    (reset! died-ticks 0)
+    (reset! died? false)
     (doall (map (fn [table]
-                  ;;(.log js/console (.getBoxHelper table))
-                  ($ scene add (.getObject3d table))
-                  ;;            ($ scene add (.getBoxHelper table))
-                  ) tables))
+                  ($ scene add (.getObject3d table))) tables))
     ;; ($ scene add (js/THREE.BoxHelper. tables))
+    (show-lives! state)
     ;; initial table decorations
     (doall (map #(.setDecoration % (first (:table-cycle @state))) tables))
     (set-decorations! tables @table-decorations state)
