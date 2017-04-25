@@ -733,10 +733,6 @@
         change-to-table (r/cursor state [:change-to-table])
         change-to-decoration (r/cursor state [:change-to-decoration])
         win-con (r/cursor state [:win-con])]
-    ;;    ($ js/createjs Sound.stop "greedy_pigeon_theme")
-    ($ js/createjs Sound.stop "greedy_pigeon_theme")
-    ($ js/createjs Sound.play "greedy_pigeon_theme")
-
     ;; reset the key-state
     (reset! key-state (:key-state initial-state))
     ;; update the hero, broom and boot boxes
