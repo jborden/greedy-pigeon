@@ -78,13 +78,31 @@
   [{:table-cycle ["cash-small" "none"]
     :win-con "none"
     :cycle? false}
-   {:table-cycle ["none" "coins-small" "coins-big"]
-    :win-con "coins-big"
+   {:table-cycle ["none" "poop-small"]
+    :win-con "poop-small"
+    :cycle? false}
+   {:table-cycle ["cash-small" "cash-lots" "poop-small"]
+    :win-con "poop-small"
     :cycle? false}
    {:table-cycle ["none" "poop-small"]
     :win-con "poop-small"
     :cycle? true}
+   {:table-cycle ["none" "poop-small" "poop-medium"]
+    :win-con "poop-medium"
+    :cycle? false}
+   {:table-cycle ["cash-small" "cash-lots" "cash-and-coins" "none"]
+    :win-con "none"
+    :cycle? false}
    {:table-cycle ["none" "poop-small" "poop-medium" "poop-big"]
+    :win-con "poop-big"
+    :cycle? false}
+   {:table-cycle ["coins-small" "cash-small" "cash-lots" "cash-and-coins" "none"]
+    :win-con "none"
+    :cycle? false}
+   {:table-cycle ["none" "poop-small" "poop-medium"]
+    :win-con "poop-medium"
+    :cycle? true}
+   {:table-cycle ["none" "cash-lots" "cash-and-coins" "poop-small" "poop-big"]
     :win-con "poop-big"
     :cycle? true}])
 
@@ -303,17 +321,17 @@
 (defn poop-small-decoration
   []
   (table-decoration (:poop-small-texture @state)
-                    120 60))
+                    60 30))
 
 (defn poop-medium-decoration
   []
   (table-decoration (:poop-medium-texture @state)
-                    120 60))
+                    100 50))
 
 (defn poop-big-decoration
   []
   (table-decoration (:poop-big-texture @state)
-                    120 60))
+                    150 75))
 
 (defn table
   []
@@ -1018,6 +1036,7 @@
         win-con (r/cursor state [:win-con])
         cycle? (r/cursor state [:cycle?])
         total-score (r/cursor state [:total-score])]
+    ($ js/createjs Sound.stop "greedy_pigeon_theme")
     ($ js/createjs Sound.play "greedy_pigeon_theme")
     (swap! state assoc
            :render-fn render-fn
@@ -1037,7 +1056,7 @@
     ($ scene add (.getObject3d boot))
     ($ scene add (.getObject3d shadow))
     ;; ($! (.getObject3d shadow) :position.z 9)
-;;    ($ scene add (origin))
+    ;;    ($ scene add (origin))
     (reset! lives 3)
     ;;(.moveTo hero 0 690)
     ;; (.moveTo hero 0 ;;700
