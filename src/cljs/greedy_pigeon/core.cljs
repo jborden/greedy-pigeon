@@ -733,6 +733,10 @@
         change-to-table (r/cursor state [:change-to-table])
         change-to-decoration (r/cursor state [:change-to-decoration])
         win-con (r/cursor state [:win-con])]
+    ;;    ($ js/createjs Sound.stop "greedy_pigeon_theme")
+    ($ js/createjs Sound.stop "greedy_pigeon_theme")
+    ($ js/createjs Sound.play "greedy_pigeon_theme")
+
     ;; reset the key-state
     (reset! key-state (:key-state initial-state))
     ;; update the hero, broom and boot boxes
@@ -945,6 +949,7 @@
         (when (= (occupied-table @hero @tables)
                  (occupied-table @broom @tables))
           (when (= @lives 0)
+            ($ js/createjs Sound.stop "greedy_pigeon_theme")
             ($ js/createjs Sound.play "gameover")
             (reset! died? true)
             (init-game-lost-screen))
@@ -956,6 +961,7 @@
         (when (= (occupied-table @hero @tables)
                  (occupied-table @boot @tables))
           (when (= @lives 0)
+            ($ js/createjs Sound.stop "greedy_pigeon_theme")
             ($ js/createjs Sound.play "gameover")
             (reset! died? true)
             (init-game-lost-screen))
@@ -1016,6 +1022,7 @@
         win-con (r/cursor state [:win-con])
         cycle? (r/cursor state [:cycle?])
         total-score (r/cursor state [:total-score])]
+    ($ js/createjs Sound.play "greedy_pigeon_theme")
     (swap! state assoc
            :render-fn render-fn
            :hero hero
@@ -1120,7 +1127,7 @@
   []
   (let [font (r/cursor state [:font])]
     (fn [delta-t]
-      (when-not (nil? @font)
+      (when ($ js/createjs Sound.loadComplete "greedy_pigeon_theme")
         (init-game)))))
 
 (defn load-game-assets
