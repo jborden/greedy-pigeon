@@ -63,6 +63,7 @@
                     :lives-symbols nil
                     :score nil
                     :score-text nil
+                    :total-score nil
                     :change-to-text nil
                     :change-to-table nil
                     :change-to-decoration nil
@@ -799,6 +800,8 @@
         broom-offset (r/cursor state [:broom-offset])
         boot-offset (r/cursor state [:boot-offset])
         shadow-offset (r/cursor state [:shadow-offset])
+        total-score (r/cursor state [:total-score])
+        score (r/cursor state [:score])
         move-hero! (fn [hero allowed-directions direction]
                      (when (direction allowed-directions)
                        ;; move hero
@@ -812,7 +815,7 @@
                        ;; redraw the table decorations
                        (set-decorations! @tables @table-decorations state)
                        ;; reset the score
-                       (reset-score! state (calculate-score state))
+                       (reset-score! state (+ @total-score (calculate-score state)))
                        ;; redraw the score
                        ($ js/createjs Sound.play (:hop @state))))
         move-broom! (fn [broom table]
@@ -854,6 +857,7 @@
         (set-stage! (next-stage))
         ;; reinitialize the stage
         ;;(init-game-won-screen)
+        (reset! total-score @score)
         (init-stage state))
       ;; set the allowed directions
       (reset! hero-allowed-directions (allowed-directions (occupied-table @hero @tables) @tables))
@@ -986,7 +990,8 @@
         win-con (r/cursor state [:win-con])
         table-cycle (r/cursor state [:table-cycle])
         win-con (r/cursor state [:win-con])
-        cycle? (r/cursor state [:cycle?])]
+        cycle? (r/cursor state [:cycle?])
+        total-score (r/cursor state [:total-score])]
     (swap! state assoc
            :render-fn render-fn
            :hero hero
@@ -1026,6 +1031,7 @@
     ;;    (reset! score (calculate-score state))
     ;; score is initiall 0
     (reset! score 0)
+    (reset! total-score 0)
     ;;    (reset! died? false)
     ;; add the tables to the scene
     (doall (map (fn [table]
