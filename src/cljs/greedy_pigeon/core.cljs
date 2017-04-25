@@ -722,8 +722,7 @@
     ;; move the broom to the proper place
     (.moveTo @broom
              1200 ;;-480
-             ;;(+ -600 @broom-offset)
-             10000
+             (+ -600 @broom-offset)
              )
     ;; the shadow needs to be move to the proper place
     ($! (.getObject3d @shadow) :position.z 9)
@@ -861,7 +860,7 @@
         (init-stage state))
       ;; set the allowed directions
       (reset! hero-allowed-directions (allowed-directions (occupied-table @hero @tables) @tables))
-      ;;(reset! broom-allowed-directions (allowed-directions (occupied-table @broom @tables) @tables))
+      (reset! broom-allowed-directions (allowed-directions (occupied-table @broom @tables) @tables))
       ;; pause the game momentarily when you die
       (when (and @died? (not @paused?))
         (swap! died-ticks inc))
@@ -899,10 +898,10 @@
         (when (< @broom-ticks broom-max-ticks)
           (swap! broom-ticks inc))
         ;; ;; move the broom
-        ;; (when (= @broom-ticks broom-max-ticks)
-        ;;   (let [table-options (filter (comp not nil?) (vals @broom-allowed-directions))]
-        ;;     (move-broom! @broom (nth table-options (rand-int (count table-options))))
-        ;;     (reset! broom-ticks 0)))
+        (when (= @broom-ticks broom-max-ticks)
+          (let [table-options (filter (comp not nil?) (vals @broom-allowed-directions))]
+            (move-broom! @broom (nth table-options (rand-int (count table-options))))
+            (reset! broom-ticks 0)))
         ;; reset shadow ticks
         (when (< @shadow-ticks shadow-ticks-max)
           (swap! shadow-ticks inc))
@@ -914,13 +913,13 @@
         (when (< @boot-ticks boot-ticks-max)
           (swap! boot-ticks inc))
         ;; move the boot to where the shadow is
-        ;; (when (= @boot-ticks boot-ticks-max)
-        ;;   (let [shadow-table (occupied-table @shadow @tables)]
-        ;;     (if (not (nil? shadow-table))
-        ;;       (let [table-x ($ (.getObject3d shadow-table) :position.x)
-        ;;             table-y ($ (.getObject3d shadow-table) :position.y)]
-        ;;         (.moveTo @boot table-x (+ table-y @boot-offset))
-        ;;         (reset! boot-ticks 0)))))
+        (when (= @boot-ticks boot-ticks-max)
+          (let [shadow-table (occupied-table @shadow @tables)]
+            (if (not (nil? shadow-table))
+              (let [table-x ($ (.getObject3d shadow-table) :position.x)
+                    table-y ($ (.getObject3d shadow-table) :position.y)]
+                (.moveTo @boot table-x (+ table-y @boot-offset))
+                (reset! boot-ticks 0)))))
         ;; is the game lost?
         (when (= (occupied-table @hero @tables)
                  (occupied-table @broom @tables))
@@ -1011,7 +1010,7 @@
     ($ scene add (.getObject3d shadow))
     ;; ($! (.getObject3d shadow) :position.z 9)
     ($ scene add (origin))
-    (reset! lives 0)
+    (reset! lives 3)
     ;;(.moveTo hero 0 690)
     ;; (.moveTo hero 0 ;;700
     ;;          700
