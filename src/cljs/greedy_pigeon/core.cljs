@@ -22,12 +22,8 @@
                     :init-play-again-fn (constantly true)
                     :init-title-screen-fn (constantly true)
                     :font nil
-                    :table-cycle ;; ["none" "coins-small" "coins-big" "poop-small" "poop-medium" "poop-big"]
-                    nil
-                    ;;["none" "coins-small" "coins-big"]
-                    :win-con ;;"coins-big"
-                    nil
-                    ;; "poop-big"
+                    :table-cycle nil
+                    :win-con nil
                     :cycle? false
                     :stage
                     [[0 0 0 0 0 0 1 0 0 0 0 0 0]
@@ -410,17 +406,9 @@
       (intersectsBox [this box]
         ($ (.getBoundingBox this) intersectsBox box))
       (moveTo [this x y]
-        (let [;; x-center (/ (- ($ bounding-box :max.x)
-              ;;                ($ bounding-box :min.x))
-              ;;             2)
-              ;; y-center (/
-              ;;           (- ($ bounding-box :max.y)
-              ;;              ($ bounding-box :min.y))
-              ;;           2)
-              ]
-          ($! object3d :position.x x)
-          ($! object3d :position.y y)
-          (.updateBox this))))))
+        ($! object3d :position.x x)
+        ($! object3d :position.y y)
+        (.updateBox this)))))
 
 (defn set-tables
   "Given a vector of vectors, return a vector of tables in their proper places"
@@ -438,51 +426,12 @@
                                                                         (.moveTo table (* col table-width) (* table-height row -1))
                                                                         table))) itm)) m)))
         group (js/THREE.Group.)
-        ;; _ (doall (map #(.log js/console (.getObject3d %)) tables))
         _ (doall (map #($ group add (.getObject3d %)) tables))
-        ;; bounding-box (js/THREE.Box3.)
-        ;; _ ($ bounding-box setFromObject group)
-        ;; x-center (/ (- ($ bounding-box :max.x)
-        ;;                ($ bounding-box :min.x))
-        ;;             2)
-        ;; y-center (/
-        ;;           (- ($ bounding-box :max.y)
-        ;;              ($ bounding-box :min.y))
-        ;;           2)
-        ;; new-x (- 0 x-center)
-        ;; new-y (- 0 y-center)
         translate-x (* (- (/ total-width 2) (/ table-width 2)) -1)
-        translate-y (- (/ total-height 2) (/ table-height 2))
-        ]
-    ;; (.log js/console group)
-    ;; (.log js/console x-center)
-    ;; (.log js/console y-center)
-    ;; (.log js/console new-x)
-    ;; (.log js/console new-y)
-    ;; (.log js/console ($ bounding-box :min))
-    ;; (.log js/console ($ bounding-box :max))
-    ;; (.log js/console ($ bounding-box :min.y))
-    ;; (.log js/console ($ bounding-box :max.y))
-    ;; (.log js/console ($ bounding-box :position))
+        translate-y (- (/ total-height 2) (/ table-height 2))]
     (doall (map (fn [table]
                   (.translate table translate-x translate-y)) tables))
-    ;; (.log js/console width)
-    ;; (.log js/console height)
-    ;; ($ group translateX (+ (* (/ width 2) -1) 200))
-    ;; ($ group translateY (/ height 2))
-    ;; ($! group :position.x 0)
-    ;; ($! group :position.y 0)
-    ;; (.log js/console ($ group :position.x))
-    ;; (.log js/console ($ group :position.y))
-    ;; ($ group updateMatrix)
-    ;; ($ group translateX (* (/ width 2) -1))
-    ;; ($ group translateY (/ height 2))
-    ;; ($! group :position.x 0)
-    ;; ($! group :position.y 0)
-    ;; (.log js/console group)
-    ;;    group
-    tables
-    ))
+    tables))
 
 (defn simple-plane
   "Return an object3d that represents a simple plane box centered at x,y"
@@ -576,12 +525,8 @@
         this-bbox ($ object-bbox clone)]
     ;; because the tables lay within the z-plane
     ($ this-bbox translate (js/THREE.Vector3. 0 0 (- object-z)))
-    ;;(.log js/console object-bbox)
-    ;;(.log js/console (clj->js tables))
-    ;;(partial contains-point? (js/THREE.Vector3. object-x object-y 0))
     (first (filter
             #(.intersectsBox % this-bbox)
-            ;;(partial contains-point? (js/THREE.Vector3. object-x object-y 0))
             tables))))
 
 (defn reset-occupation!
@@ -592,7 +537,6 @@
         hero-y ($ (.getObject3d hero) :position.y)
         currently-occupied-table (occupied-table hero tables)
         non-occupied-tables (filter #(not= currently-occupied-table %) tables)]
-    ;;(.log js/console currently-occupied-table)
     (doall (map #(.resetOccupancy %) non-occupied-tables))
     (.incrementOccupancy currently-occupied-table)
     (when (= (.getOccupancy currently-occupied-table) 1)
@@ -642,7 +586,6 @@
   "Given the tables and current table-decorations, reset the table decorations"
   [tables table-decorations state]
   (let [scene @(r/cursor state [:scene])]
-;;    (.log js/console (clj->js table-decorations))
     ;; remove any table-decorations from the scene
     (when (not (empty? table-decorations))
       (doall (map #($ scene remove (.getObject3d %)) table-decorations)))
@@ -665,11 +608,7 @@
     [{:id "play-again"
       :selected? true
       :on-click (fn [e]
-                  (@(r/cursor state [:init-game])))}
-     #_ {:id "title-screen"
-         :selected? false
-         :on-click (fn [e]
-                     (@(r/cursor state [:init-title-screen-fn])))}])))
+                  (@(r/cursor state [:init-game])))}])))
 
 (defn init-game-won-screen
   "The game is won, go to 'you win' screen"
@@ -812,18 +751,12 @@
     (reset! shadow-ticks 0)
     (reset! boot-ticks 0)
     (reset! died-ticks 0)
-    ;; set the total score
-    ;; do this later
     ;; make sure we aren't dead
     (reset! died? false)
     ;; show our lives total
     (show-lives! state)
     ;; show the current score
     (reset-score! state @score)
-    ;; show the change to menu text
-    ;; (reset! change-to-text (text font-atom "Tables be like"))
-    ;; (.moveTo @change-to-text -1200 350)
-    ;; ($ scene add (.getObject3d @change-to-text))
     ;; show the change to menu table
     (reset! change-to-table (table))
     (.moveTo @change-to-table -1000 200)
@@ -883,8 +816,6 @@
                                    :position.x)
                                 (+  ($ (.getObject3d (direction allowed-directions)) :position.y)
                                     @hero-offset))
-                       ;;                    (.log js/console (count @table-decorations))
-                       ;;                      (doall (map #(.log js/console (.getDecoration %)) @tables))
                        ;; redraw the table decorations
                        (set-decorations! @tables @table-decorations state)
                        ;; reset the score
@@ -926,8 +857,6 @@
       (when (stage-won? @tables @win-con)
         ;; set to the next stage
         (set-stage! (next-stage))
-        ;; reinitialize the stage
-        ;;(init-game-won-screen)
         (reset! total-score @score)
         ($ js/createjs Sound.play "oui_haha")
         (init-stage state))
@@ -1087,34 +1016,12 @@
     (.updateBox broom)
     (.updateBox boot)
     ($ scene add (.getObject3d hero))
-;;;    ($ scene add (.getBoxHelper hero))
     ($ scene add (.getObject3d broom))
     ($ scene add (.getObject3d boot))
     ($ scene add (.getObject3d shadow))
-    ;; ($! (.getObject3d shadow) :position.z 9)
-    ;;    ($ scene add (origin))
     (reset! lives 3)
-    ;;(.moveTo hero 0 690)
-    ;; (.moveTo hero 0 ;;700
-    ;;          700
-    ;;          )
-    ;; (.moveTo broom
-    ;;          1200 ;;-480
-    ;;          (+ -600 @broom-offset))
-    ;; (.moveTo boot
-    ;;          0
-    ;;          10000)
-    ;; (.moveTo shadow 0
-    ;;          (+ 600 @(r/cursor state [:shadow-offset])))
-    ;; (reset! broom-ticks 0)
-    ;; (reset! shadow-ticks 0)
-    ;; (reset! boot-ticks 0)
-    ;; (reset! died-ticks 0)
-    ;;    (reset! score (calculate-score state))
-    ;; score is initiall 0
     (reset! score 0)
     (reset! total-score 0)
-    ;;    (reset! died? false)
     ;; add the tables to the scene
     (doall (map (fn [table]
                   ($ scene add (.getObject3d table))) tables))
@@ -1122,30 +1029,16 @@
     (show-lives! state)
     ;; set the score text
     (reset! score-text (text font-atom @score))
-    ;; (.moveTo @score-text -1200 700)
-    ;; ($ scene add (.getObject3d @score-text))
     ;; show the change to menu text
     (reset! change-to-text (text font-atom "Change To"))
     (.moveTo @change-to-text -1190 350)
     ($ scene add (.getObject3d @change-to-text))
-    ;; show the change to menu table
-    ;; (reset! change-to-table (table))
-    ;; (.moveTo @change-to-table -1000 200)
-    ;; ($ scene add (.getObject3d @change-to-table))
-    ;; set the decoration to win-con
-    ;;(.setDecoration @change-to-table @win-con)
-    ;; show the change to decoration
-    ;; (reset! change-to-decoration (set-decoration! @change-to-table))
-    ;; initial table decorations
-    ;; (doall (map #(.setDecoration % (first (:table-cycle @state))) tables))
-    ;; (set-decorations! tables @table-decorations state)
     (reset! time-fn (game-fn))
     ;; set the proper stage
     (set-stage! 0)
     (init-stage state)
     ;; add the instructions
     ($ scene add instructions)
-
     (display/window-resize! renderer camera)
     (r/render
      [:div {:id "root-node"}
@@ -1198,7 +1091,7 @@
         poop-medium-texture (r/cursor state [:poop-medium-texture])
         poop-big-texture (r/cursor state [:poop-big-texture])
         boot-texture (r/cursor state [:boot-texture])
-        ;;        shadow-grey-texture (r/cursor state [:shadow-grey-texture])
+        shadow-grey-texture (r/cursor state [:shadow-grey-texture])
         shadow-black-texture (r/cursor state [:shadow-black-texture])
         cash-small-texture (r/cursor state [:cash-small-texture])
         cash-lots-texture (r/cursor state [:cash-lots-texture])
@@ -1211,7 +1104,7 @@
     (reset! poop-small-texture (js/THREE.ImageUtils.loadTexture. "images/poop_small.png"))
     (reset! poop-medium-texture (js/THREE.ImageUtils.loadTexture. "images/poop_medium.png"))
     (reset! poop-big-texture (js/THREE.ImageUtils.loadTexture. "images/poop_big.png"))
-    ;;    (reset! shadow-grey-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_grey.png"))
+    (reset! shadow-grey-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_grey.png"))
     (reset! shadow-black-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_black.png"))
     (reset! boot-texture (js/THREE.ImageUtils.loadTexture. "images/boot_a.png"))
     (reset! cash-small-texture (js/THREE.ImageUtils.loadTexture. "images/cash_small.png"))
