@@ -387,12 +387,12 @@
         (reset! decoration name)))))
 
 (defn text
-  [font-atom text]
+  [font-atom text & [color]]
   (let [geometry (js/THREE.TextGeometry. text
                                          (clj->js {:font @font-atom
                                                    :size 50
                                                    :height 10}))
-        material (js/THREE.MeshBasicMaterial. (clj->js {:color 0xD4AF37}))
+        material (js/THREE.MeshBasicMaterial. (clj->js {:color (or color 0xD4AF37)}))
         mesh (js/THREE.Mesh. geometry material)
         object3d ($ (js/THREE.Object3D.) add mesh)
         box-helper (js/THREE.BoxHelper. object3d 0x00ff00)
@@ -504,10 +504,10 @@
         pigeon (pigeon)
         group (js/THREE.Group.)
         font-atom (r/cursor state [:font])
-        up (text font-atom "W")
-        left (text font-atom "A")
-        down (text font-atom "S")
-        right (text font-atom "D")]
+        up (text font-atom "W" 0xFFFFFF)
+        left (text font-atom "A" 0xFFFFFF)
+        down (text font-atom "S" 0xFFFFFF)
+        right (text font-atom "D" 0xFFFFFF)]
     (.moveTo pigeon 1000 200)
     (.moveTo up 1160 425)
     (.moveTo left 770 425)
