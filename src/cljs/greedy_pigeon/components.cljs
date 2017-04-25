@@ -39,26 +39,13 @@
 
 (defn GameLostScreen
   []
-  (fn [{:keys [selected-menu-item]}]
-    [:div {:id "title-screen"}
-     [:div {:id "title"
-            :style {:color "#FFF"}}
-      "Game Over"]
-     [:div {:id "title-menu"}
-      [:div {:id "start"}
-       [:div {:class "selection-symbol"}
-        (str (if (= @selected-menu-item
-                    "play-again")
-               "→"
-               ""))]
-       " Play Again"]
-      [:div {:id "foo"}
-       [:div {:class "selection-symbol"}
-        (str (if (= @selected-menu-item
-                    "title-screen")
-               "→"
-               ""))]
-       " Title Screen"]]]))
+  (fn [{:keys [url]}]
+    [:div {:id "title-screen"
+           :style {:position "absolute"}}
+     [:img {:src url
+            :style {:margin "0 auto"
+                    :height "inherit"
+                    :display "block"}}]]))
 
 (defn PauseComponent
   "Props is:
@@ -79,7 +66,7 @@
                        {:display "none"})
               :on-click on-click}
         [:span {:style {:font-size "40px"}}
-         "Click to Unpause"]
+         "Click or Press Space Key to Unpause"]
         [:br]
         "W, A, S, D / Arrow Keys = Move, "]])))
 

@@ -632,10 +632,10 @@
       :selected? true
       :on-click (fn [e]
                   (@(r/cursor state [:init-game])))}
-     {:id "title-screen"
-      :selected? false
-      :on-click (fn [e]
-                  (@(r/cursor state [:init-title-screen-fn])))}])))
+     #_ {:id "title-screen"
+         :selected? false
+         :on-click (fn [e]
+                     (@(r/cursor state [:init-title-screen-fn])))}])))
 
 (defn init-game-won-screen
   "The game is won, go to 'you win' screen"
@@ -652,7 +652,7 @@
 
 (defn init-game-lost-screen
   "The game is lost, go to 'Game Over' screen"
-  []
+  [url]
   (let [time-fn (r/cursor state [:time-fn])
         key-state (r/cursor state [:key-state])
         selected-menu-item (r/cursor state [:selected-menu-item])]
@@ -660,7 +660,8 @@
     (reset! selected-menu-item "play-again")
     (reset! time-fn (play-again-fn))
     (r/render
-     [GameLostScreen {:selected-menu-item selected-menu-item}]
+     [GameLostScreen {:selected-menu-item selected-menu-item
+                      :url url}]
      ($ js/document getElementById "reagent-app"))))
 
 (defn show-lives!
@@ -966,7 +967,7 @@
             ($ js/createjs Sound.stop "greedy_pigeon_theme")
             ($ js/createjs Sound.play "gameover")
             (reset! died? true)
-            (init-game-lost-screen))
+            (init-game-lost-screen "images/broomed.png"))
           (when (> @lives 0)
             ($ js/createjs Sound.play "ohno1")
             (swap! lives dec)
@@ -978,7 +979,7 @@
             ($ js/createjs Sound.stop "greedy_pigeon_theme")
             ($ js/createjs Sound.play "gameover")
             (reset! died? true)
-            (init-game-lost-screen))
+            (init-game-lost-screen "images/smashed.png"))
           (when (> @lives 0)
             ($ js/createjs Sound.play "no")
             (swap! lives dec)
