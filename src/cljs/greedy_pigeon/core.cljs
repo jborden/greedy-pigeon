@@ -66,7 +66,8 @@
                     :change-to-table nil
                     :change-to-decoration nil
                     :background-overlay nil
-                    :current-stage nil})
+                    :current-stage nil
+                    :stage-text nil})
 
 (defonce state (r/atom initial-state))
 
@@ -101,27 +102,6 @@
    {:table-cycle ["none" "cash-lots" "cash-and-coins" "poop-small" "poop-big"]
     :win-con "poop-big"
     :cycle? true}])
-
-(defn set-stage!
-  [n]
-  (let [table-cycle (r/cursor state [:table-cycle])
-        win-con (r/cursor state [:win-con])
-        cycle? (r/cursor state [:cycle?])
-        current-stage (r/cursor state [:current-stage])
-        stage (nth stages n)]
-    (reset! current-stage n)
-    (reset! table-cycle (:table-cycle stage))
-    (reset! win-con (:win-con stage))
-    (reset! cycle? (:cycle? stage))))
-
-(defn next-stage
-  []
-  (let [current-stage (r/cursor state [:current-stage])
-        next-stage (+ @current-stage 1)]
-    (if (> next-stage (- (count stages) 1))
-      0
-      next-stage)))
-
 
 (defn broom
   []
@@ -697,6 +677,41 @@
     (.moveTo @score-text -1200 700)
     ($ @scene add (.getObject3d @score-text))))
 
+(defn reset-displayed-stage!
+  "reset the current displayed stage, showing which one we are on"
+  [n]
+  (let [current-stage (r/cursor state [:current-stage])
+        stage-text (r/cursor state [:stage-text])
+        scene (r/cursor state [:scene])
+        font-atom (r/cursor state [:font])]
+    (reset! current-stage n)
+    (when ((comp not nil?) @stage-text)
+      ($ @scene remove (.getObject3d @stage-text)))
+    (reset! stage-text (text font-atom (str "Stage " (+ @current-stage 1))))
+    (.moveTo @stage-text -1200 600)
+    ($ @scene add (.getObject3d @stage-text))))
+
+(defn set-stage!
+  [n]
+  (let [table-cycle (r/cursor state [:table-cycle])
+        win-con (r/cursor state [:win-con])
+        cycle? (r/cursor state [:cycle?])
+        current-stage (r/cursor state [:current-stage])
+        stage (nth stages n)]
+    (reset! current-stage n)
+    (reset! table-cycle (:table-cycle stage))
+    (reset! win-con (:win-con stage))
+    (reset! cycle? (:cycle? stage))
+    (reset-displayed-stage! n)))
+
+(defn next-stage
+  []
+  (let [current-stage (r/cursor state [:current-stage])
+        next-stage (+ @current-stage 1)]
+    (if (> next-stage (- (count stages) 1))
+      0
+      next-stage)))
+
 (defn init-stage
   [state]
   (let [scene (r/cursor state [:scene])
@@ -992,6 +1007,7 @@
         lives (r/cursor state [:lives])
         score (r/cursor state [:score])
         score-text (r/cursor state [:score-text])
+        stage-text (r/cursor state [:stage-text])
         change-to-text (r/cursor state [:change-to-text])
         change-to-table (r/cursor state [:change-to-table])
         change-to-decoration (r/cursor state [:change-to-decoration])
@@ -1031,7 +1047,7 @@
     (reset! score-text (text font-atom @score))
     ;; show the change to menu text
     (reset! change-to-text (text font-atom "Change To"))
-    (.moveTo @change-to-text -1190 350)
+    (.moveTo @change-to-text -1170 350)
     ($ scene add (.getObject3d @change-to-text))
     (reset! time-fn (game-fn))
     ;; set the proper stage
