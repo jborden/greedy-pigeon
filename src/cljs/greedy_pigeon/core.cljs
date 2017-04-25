@@ -39,7 +39,6 @@
                      [1 0 1 0 1 0 1 0 1 0 1 0 1]]
                     :table-height 200
                     :table-width 200
-                    :hop "Hop"
                     :table-texture nil
                     :hero-texture nil
                     :broom-texture nil
@@ -48,6 +47,9 @@
                     :poop-small-texture nil
                     :poop-medium-texture nil
                     :poop-big-texture nil
+                    :cash-small-texture nil
+                    :cash-lots-texture nil
+                    :cash-and-coins-texture nil
                     :shadow-grey-texture nil
                     :shadow-black-texture nil
                     :boot-texture nil
@@ -73,14 +75,17 @@
 (defonce state (r/atom initial-state))
 
 (def stages
-  [{:table-cycle ["none" "coins-small"]
-    :win-con "coins-small"
+  [{:table-cycle ["cash-small" "none"]
+    :win-con "none"
     :cycle? false}
    {:table-cycle ["none" "coins-small" "coins-big"]
     :win-con "coins-big"
     :cycle? false}
    {:table-cycle ["none" "poop-small"]
     :win-con "poop-small"
+    :cycle? true}
+   {:table-cycle ["none" "poop-small" "poop-medium" "poop-big"]
+    :win-con "poop-big"
     :cycle? true}])
 
 (defn set-stage!
@@ -90,7 +95,6 @@
         cycle? (r/cursor state [:cycle?])
         current-stage (r/cursor state [:current-stage])
         stage (nth stages n)]
-    (.log js/console "stage " (clj->js stage))
     (reset! current-stage n)
     (reset! table-cycle (:table-cycle stage))
     (reset! win-con (:win-con stage))
@@ -274,6 +278,21 @@
 (defn coins-small-decoration
   []
   (table-decoration (:coins-small-texture @state)
+                    120 60))
+
+(defn cash-small-decoration
+  []
+  (table-decoration (:cash-small-texture @state)
+                    120 60))
+
+(defn cash-lots-decoration
+  []
+  (table-decoration (:cash-lots-texture @state)
+                    120 60))
+
+(defn cash-and-coins-decoration
+  []
+  (table-decoration (:cash-and-coins-texture @state)
                     120 60))
 
 (defn coins-big-decoration
@@ -558,7 +577,10 @@
                            "coins-big" (coins-big-decoration)
                            "poop-small" (poop-small-decoration)
                            "poop-medium" (poop-medium-decoration)
-                           "poop-big" (poop-big-decoration))]
+                           "poop-big" (poop-big-decoration)
+                           "cash-small" (cash-small-decoration)
+                           "cash-lots" (cash-lots-decoration)
+                           "cash-and-coins" (cash-and-coins-decoration))]
     (when (not (nil? table-decoration))
       (.moveTo table-decoration table-x (+ table-y 50))
       ($ @scene add (.getObject3d table-decoration)))
@@ -759,7 +781,6 @@
     (reset! change-to-decoration (set-decoration! @change-to-table))
     ;; initialize table
     (doall (map #(.setDecoration % (first (:table-cycle @state))) @tables))
-    (doall (map #(.log js/console (.getDecoration %)) @tables))
     (doall (map #(.resetVisited %) @tables))
     ;; add the new ones in
     (set-decorations! @tables @table-decorations state)))
@@ -809,14 +830,14 @@
                                    :position.x)
                                 (+  ($ (.getObject3d (direction allowed-directions)) :position.y)
                                     @hero-offset))
-   ;;                    (.log js/console (count @table-decorations))
- ;;                      (doall (map #(.log js/console (.getDecoration %)) @tables))
+                       ;;                    (.log js/console (count @table-decorations))
+                       ;;                      (doall (map #(.log js/console (.getDecoration %)) @tables))
                        ;; redraw the table decorations
                        (set-decorations! @tables @table-decorations state)
                        ;; reset the score
                        (reset-score! state (+ @total-score (calculate-score state)))
                        ;; redraw the score
-                       ($ js/createjs Sound.play (:hop @state))))
+                       ($ js/createjs Sound.play "moveclick5")))
         move-broom! (fn [broom table]
                       (.moveTo broom
                                ($ (.getObject3d table) :position.x)
@@ -850,13 +871,12 @@
       (set-decorations-cycle! @table-cycle @cycle? @tables)
       ;; is the stage won?
       (when (stage-won? @tables @win-con)
-        (.log js/console "I think I won")
-        (.log js/console "current-stage is: " @current-stage)
         ;; set to the next stage
         (set-stage! (next-stage))
         ;; reinitialize the stage
         ;;(init-game-won-screen)
         (reset! total-score @score)
+        ($ js/createjs Sound.play "oui_haha")
         (init-stage state))
       ;; set the allowed directions
       (reset! hero-allowed-directions (allowed-directions (occupied-table @hero @tables) @tables))
@@ -920,22 +940,27 @@
                     table-y ($ (.getObject3d shadow-table) :position.y)]
                 (.moveTo @boot table-x (+ table-y @boot-offset))
                 (reset! boot-ticks 0)))))
+
         ;; is the game lost?
         (when (= (occupied-table @hero @tables)
                  (occupied-table @broom @tables))
           (when (= @lives 0)
+            ($ js/createjs Sound.play "gameover")
             (reset! died? true)
             (init-game-lost-screen))
           (when (> @lives 0)
+            ($ js/createjs Sound.play "ohno1")
             (swap! lives dec)
             (show-lives! state)
             (reset! died? true)))
         (when (= (occupied-table @hero @tables)
                  (occupied-table @boot @tables))
           (when (= @lives 0)
+            ($ js/createjs Sound.play "gameover")
             (reset! died? true)
             (init-game-lost-screen))
           (when (> @lives 0)
+            ($ js/createjs Sound.play "no")
             (swap! lives dec)
             (show-lives! state)
             (reset! died? true))))
@@ -1073,7 +1098,23 @@
 
 (defn load-sound!
   []
-  ($ js/createjs Sound.registerSound "audio/bounce.mp3" (:hop @state)))
+  ($ js/createjs Sound.registerSound "audio/moveclick1.mp3" "moveclick1")
+  ($ js/createjs Sound.registerSound "audio/moveclick2.mp3" "moveclick2")
+  ($ js/createjs Sound.registerSound "audio/moveclick3.mp3" "moveclick3")
+  ($ js/createjs Sound.registerSound "audio/moveclick4.mp3" "moveclick4")
+  ($ js/createjs Sound.registerSound "audio/moveclick5.mp3" "moveclick5")
+  ($ js/createjs Sound.registerSound "audio/no.mp3" "no")
+  ($ js/createjs Sound.registerSound "audio/ohno1.mp3" "ohno1")
+  ($ js/createjs Sound.registerSound "audio/ooh_long.mp3" "ooh_long")
+  ($ js/createjs Sound.registerSound "audio/oui.mp3" "oui")
+  ($ js/createjs Sound.registerSound "audio/oui_haha.mp3" "oui_haha")
+  ($ js/createjs Sound.registerSound "audio/smash.mp3" "smash")
+  ($ js/createjs Sound.registerSound "audio/sweep.mp3" "sweep")
+  ($ js/createjs Sound.registerSound "audio/youve_died.mp3" "youve_died")
+  ($ js/createjs Sound.registerSound "audio/ahha1.mp3" "ahha1")
+  ($ js/createjs Sound.registerSound "audio/ahha2.mp3" "ahha2")
+  ($ js/createjs Sound.registerSound "audio/gameover.mp3" "gameover")
+  ($ js/createjs Sound.registerSound "audio/greedy_pigeon_theme.mp3" "greedy_pigeon_theme"))
 
 (defn load-assets-fn
   []
@@ -1097,7 +1138,10 @@
         poop-big-texture (r/cursor state [:poop-big-texture])
         boot-texture (r/cursor state [:boot-texture])
         ;;        shadow-grey-texture (r/cursor state [:shadow-grey-texture])
-        shadow-black-texture (r/cursor state [:shadow-black-texture])]
+        shadow-black-texture (r/cursor state [:shadow-black-texture])
+        cash-small-texture (r/cursor state [:cash-small-texture])
+        cash-lots-texture (r/cursor state [:cash-lots-texture])
+        cash-and-coins-texture (r/cursor state [:cash-and-coins-texture])]
     (reset! table-texture (js/THREE.ImageUtils.loadTexture. "images/table_red.png"))
     (reset! hero-texture (js/THREE.ImageUtils.loadTexture. "images/pigeon_right_a.png"))
     (reset! broom-texture (js/THREE.ImageUtils.loadTexture. "images/broom.png"))
@@ -1109,6 +1153,9 @@
     ;;    (reset! shadow-grey-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_grey.png"))
     (reset! shadow-black-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_black.png"))
     (reset! boot-texture (js/THREE.ImageUtils.loadTexture. "images/boot_a.png"))
+    (reset! cash-small-texture (js/THREE.ImageUtils.loadTexture. "images/cash_small.png"))
+    (reset! cash-lots-texture (js/THREE.ImageUtils.loadTexture. "images/cash_lots.png"))
+    (reset! cash-and-coins-texture (js/THREE.ImageUtils.loadTexture. "images/cash_and_coins.png"))
     (load-font! font-url font-atom)
     (load-sound!)
     (reset! time-fn (load-assets-fn))))
@@ -1122,15 +1169,7 @@
                      [{:id "start"
                        :selected? true
                        :on-click (fn [e]
-                                   (load-game-assets))}
-                      {:id "foo"
-                       :selected? false
-                       :on-click (fn [e]
-                                   ($ js/console log "foo"))}
-                      {:id "bar"
-                       :selected? false
-                       :on-click (fn [e]
-                                   ($ js/console log "foo"))}])))
+                                   (load-game-assets))}])))
 
 (defn ^:export init-title-screen
   []
