@@ -18,21 +18,7 @@
                     "start")
                "→"
                ""))]
-       " Start"]
-      [:div {:id "foo"}
-       [:div {:class "selection-symbol"}
-        (str (if (= @selected-menu-item
-                    "foo")
-               "→"
-               ""))]
-       " Foo"]
-      [:div {:id "bar"}
-       [:div {:class "selection-symbol"}
-        (str (if (= @selected-menu-item
-                    "bar")
-               "→"
-               ""))]
-       " Bar" ]]]))
+       " Start"]]]))
 
 (defn GameWonScreen
   []

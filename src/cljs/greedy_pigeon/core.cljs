@@ -809,7 +809,7 @@
         boot (r/cursor state [:boot])
         boot-ticks-max 99
         boot-ticks (r/cursor state [:boot-ticks])
-        p-ticks-counter (r/cursor state [:p-ticks-counter])
+        space-ticks-counter (r/cursor state [:space-ticks-counter])
         up-ticks-counter (r/cursor state [:up-ticks-counter])
         right-ticks-counter (r/cursor state [:right-ticks-counter])
         down-ticks-counter (r/cursor state [:down-ticks-counter])
@@ -852,8 +852,8 @@
     (fn [delta-t]
       (@render-fn)
       ;; p-key is up, reset the delay
-      (if (not (:p @key-state))
-        (reset! p-ticks-counter 0))
+      (if (not (:space @key-state))
+        (reset! space-ticks-counter 0))
       (if (and (not (:up-arrow @key-state))
                (not (:w @key-state)))
         (reset! up-ticks-counter 0))
@@ -969,8 +969,8 @@
       ;; listen for the p-key depress
       (controls/key-down-handler
        @key-state
-       {:p-fn (fn [] (controls/delay-repeat ticks-max p-ticks-counter
-                                            #(reset! paused? (not @paused?))))}))))
+       {:space-fn (fn [] (controls/delay-repeat ticks-max space-ticks-counter
+                                                #(reset! paused? (not @paused?))))}))))
 
 
 (defn ^:export init-game
