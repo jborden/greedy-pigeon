@@ -1041,7 +1041,7 @@
     ($ scene add (.getObject3d boot))
     ($ scene add (.getObject3d shadow))
     ;; ($! (.getObject3d shadow) :position.z 9)
-    ($ scene add (origin))
+;;    ($ scene add (origin))
     (reset! lives 3)
     ;;(.moveTo hero 0 690)
     ;; (.moveTo hero 0 ;;700
