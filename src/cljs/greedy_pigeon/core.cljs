@@ -423,7 +423,7 @@
           (.updateBox this))))))
 
 (defn set-tables
-  "Given a vector of vectors, return a vector of table in their proper places"
+  "Given a vector of vectors, return a vector of tables in their proper places"
   [m]
   (let [table-width 200
         table-height 200
@@ -494,6 +494,40 @@
     ($! object3d :position.x x)
     ($! object3d :position.y y)
     object3d))
+
+(defn instructions
+  []
+  (let [table-arrangement [[1 0 1]
+                           [0 0 0]
+                           [1 0 1]]
+        tables (set-tables table-arrangement)
+        pigeon (pigeon)
+        group (js/THREE.Group.)
+        font-atom (r/cursor state [:font])
+        up (text font-atom "W")
+        left (text font-atom "A")
+        down (text font-atom "S")
+        right (text font-atom "D")]
+    (.moveTo pigeon 1000 200)
+    (.moveTo up 1160 425)
+    (.moveTo left 770 425)
+    (.moveTo down 770 20)
+    (.moveTo right 1170 20)
+    ($ group add (.getObject3d pigeon))
+    (doall (map (fn [table] (.translate table 1000 200)) tables))
+    (doall (map #($ group add (.getObject3d %)) tables))
+    ($ group add (.getObject3d up))
+    ($! (.getObject3d up) :position.z 15)
+    ($! (.getObject3d left) :position.z 15)
+    ($! (.getObject3d down) :position.z 15)
+    ($! (.getObject3d right) :position.z 15)
+    ($ group add (.getObject3d left))
+    ($ group add (.getObject3d down))
+    ($ group add (.getObject3d right))
+    ($! group :position.z -2000)
+    ($! group :position.x 1000)
+    ($! group :position.y 300)
+    group))
 
 (defn plane->bounding-box
   "Given an object3d that represents a simple plane, return a bounding box for it"
@@ -1036,7 +1070,8 @@
         table-cycle (r/cursor state [:table-cycle])
         win-con (r/cursor state [:win-con])
         cycle? (r/cursor state [:cycle?])
-        total-score (r/cursor state [:total-score])]
+        total-score (r/cursor state [:total-score])
+        instructions (instructions)]
     ($ js/createjs Sound.stop "greedy_pigeon_theme")
     ($ js/createjs Sound.play "greedy_pigeon_theme")
     (swap! state assoc
@@ -1108,6 +1143,9 @@
     ;; set the proper stage
     (set-stage! 0)
     (init-stage state)
+    ;; add the instructions
+    ($ scene add instructions)
+
     (display/window-resize! renderer camera)
     (r/render
      [:div {:id "root-node"}
