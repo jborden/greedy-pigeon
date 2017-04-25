@@ -7,18 +7,12 @@
 (defn TitleScreen
   []
   (fn [{:keys [selected-menu-item]}]
-    [:div {:id "title-screen"}
-     [:div {:id "title"
-            :style {:color "#FFF"}}
-      "Greedy Pigeon"]
-     [:div {:id "title-menu"}
-      [:div {:id "start"}
-       [:div {:class "selection-symbol"}
-        (str (if (= @selected-menu-item
-                    "start")
-               "→"
-               ""))]
-       " Start"]]]))
+    [:div {:id "title-screen"
+           :style {:position "absolute"}}
+     [:img {:src "images/title.png"
+            :style {:margin "0 auto"
+                    :height "inherit"
+                    :display "block"}}]]))
 
 (defn GameWonScreen
   []
