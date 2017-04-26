@@ -75,17 +75,11 @@
   [{:table-cycle ["cash-small" "none"]
     :win-con "none"
     :cycle? false}
-   {:table-cycle ["none" "poop-small"]
+   {:table-cycle ["none" "cash-small" "poop-small"]
     :win-con "poop-small"
     :cycle? false}
    {:table-cycle ["cash-small" "cash-lots" "poop-small"]
     :win-con "poop-small"
-    :cycle? false}
-   {:table-cycle ["none" "poop-small"]
-    :win-con "poop-small"
-    :cycle? true}
-   {:table-cycle ["none" "poop-small" "poop-medium"]
-    :win-con "poop-medium"
     :cycle? false}
    {:table-cycle ["cash-small" "cash-lots" "cash-and-coins" "none"]
     :win-con "none"
@@ -96,12 +90,18 @@
    {:table-cycle ["coins-small" "cash-small" "cash-lots" "cash-and-coins" "none"]
     :win-con "none"
     :cycle? false}
-   {:table-cycle ["none" "poop-small" "poop-medium"]
-    :win-con "poop-medium"
+   {:table-cycle ["none" "poop-small"]
+    :win-con "poop-small"
     :cycle? true}
    {:table-cycle ["none" "cash-lots" "cash-and-coins" "poop-small" "poop-big"]
     :win-con "poop-big"
-    :cycle? true}])
+    :cycle? false}
+   {:table-cycle ["none" "cash-lots" "cash-and-coins" "poop-small" "poop-big"]
+    :win-con "poop-big"
+    :cycle? false}
+   {:table-cycle ["none" "coins-small" "cash-lots" "cash-and-coins" "poop-small" "poop-big"]
+    :win-con "poop-big"
+    :cycle? false}])
 
 (defn broom
   []
