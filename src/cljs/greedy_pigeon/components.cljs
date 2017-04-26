@@ -39,13 +39,21 @@
 
 (defn GameLostScreen
   []
-  (fn [{:keys [url]}]
+  (fn [{:keys [url score stage]}]
     [:div {:id "title-screen"
            :style {:position "absolute"}}
      [:img {:src url
             :style {:margin "0 auto"
                     :height "inherit"
-                    :display "block"}}]]))
+                    :display "block"}}]
+     [:div {:style {:color "white"
+                    :position "absolute"
+                    :top "0"
+                    :margin "0 auto"
+                    :width "100%"
+                    :text-align "center"
+                    :font-size "1.5em"}}
+      (str "You got to Stage " stage " with a Score of " score)]]))
 
 (defn PauseComponent
   "Props is:
@@ -66,7 +74,7 @@
                        {:display "none"})
               :on-click on-click}
         [:span {:style {:font-size "40px"}}
-         "Click or Press Space Key to Unpause"]
+         "Click or Press Space Key to Unpause  "]
         [:br]
         "W, A, S, D / Arrow Keys = Move, "]])))
 

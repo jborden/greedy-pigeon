@@ -73,35 +73,25 @@
 
 (def stages
   [{:table-cycle ["cash-small" "none"]
-    :win-con "none"
     :cycle? false}
-   {:table-cycle ["none" "cash-small" "poop-small"]
-    :win-con "poop-small"
+   {:table-cycle ["cash-small" "poop-medium"]
     :cycle? false}
-   {:table-cycle ["cash-small" "cash-lots" "poop-small"]
-    :win-con "poop-small"
+   {:table-cycle ["cash-lots" "cash-small" "poop-medium"]
     :cycle? false}
-   {:table-cycle ["cash-small" "cash-lots" "cash-and-coins" "none"]
-    :win-con "none"
+   {:table-cycle ["cash-and-coins" "cash-lots" "cash-small" "none"]
     :cycle? false}
    {:table-cycle ["none" "poop-small" "poop-medium" "poop-big"]
-    :win-con "poop-big"
     :cycle? false}
-   {:table-cycle ["coins-small" "cash-small" "cash-lots" "cash-and-coins" "none"]
-    :win-con "none"
+   {:table-cycle ["cash-and-coins" "coins-small" "none" "poop-medium"]
     :cycle? false}
-   {:table-cycle ["none" "poop-small"]
-    :win-con "poop-small"
+   {:table-cycle ["none" "poop-medium"]
     :cycle? true}
-   {:table-cycle ["none" "cash-lots" "cash-and-coins" "poop-small" "poop-big"]
-    :win-con "poop-big"
+   {:table-cycle ["cash-and-coins" "coins-small" "none" "poop-medium" "poop-big"]
     :cycle? false}
-   {:table-cycle ["none" "cash-lots" "cash-and-coins" "poop-small" "poop-big"]
-    :win-con "poop-big"
+   {:table-cycle ["cash-and-coins" "coins-small" "cash-lots" "none" "poop-medium" "poop-big"]
     :cycle? false}
-   {:table-cycle ["none" "coins-small" "cash-lots" "cash-and-coins" "poop-small" "poop-big"]
-    :win-con "poop-big"
-    :cycle? false}])
+   {:table-cycle ["none" "poop-medium" "poop-big"]
+    :cycle? true}])
 
 (defn broom
   []
@@ -576,8 +566,8 @@
              (doall (map set-decoration! tables))))))
 
 (defn stage-won?
-  [tables win-con]
-  (every? true? (map #(= (.getDecoration %) win-con) tables)))
+  [tables table-cycle]
+  (every? true? (map #(= (.getDecoration %) (last table-cycle)) tables)))
 
 (defn play-again-fn
   []
@@ -608,13 +598,17 @@
   [url]
   (let [time-fn (r/cursor state [:time-fn])
         key-state (r/cursor state [:key-state])
-        selected-menu-item (r/cursor state [:selected-menu-item])]
+        selected-menu-item (r/cursor state [:selected-menu-item])
+        score (r/cursor state [:score])
+        current-stage (r/cursor state [:current-stage])]
     (reset! key-state (:key-state initial-state))
     (reset! selected-menu-item "play-again")
     (reset! time-fn (play-again-fn))
     (r/render
      [GameLostScreen {:selected-menu-item selected-menu-item
-                      :url url}]
+                      :url url
+                      :stage (+ 1 @current-stage)
+                      :score @score}]
      ($ js/document getElementById "reagent-app"))))
 
 (defn show-lives!
@@ -694,13 +688,11 @@
 (defn set-stage!
   [n]
   (let [table-cycle (r/cursor state [:table-cycle])
-        win-con (r/cursor state [:win-con])
         cycle? (r/cursor state [:cycle?])
         current-stage (r/cursor state [:current-stage])
         stage (nth stages n)]
     (reset! current-stage n)
     (reset! table-cycle (:table-cycle stage))
-    (reset! win-con (:win-con stage))
     (reset! cycle? (:cycle? stage))
     (reset-displayed-stage! n)))
 
@@ -739,7 +731,7 @@
         change-to-text (r/cursor state [:change-to-text])
         change-to-table (r/cursor state [:change-to-table])
         change-to-decoration (r/cursor state [:change-to-decoration])
-        win-con (r/cursor state [:win-con])]
+        table-cycle (r/cursor state [:table-cycle])]
     ;; reset the key-state
     (reset! key-state (:key-state initial-state))
     ;; update the hero, broom and boot boxes
@@ -777,7 +769,7 @@
     (.moveTo @change-to-table -1000 200)
     ($ @scene add (.getObject3d @change-to-table))
     ;; set the decorations to win-con
-    (.setDecoration @change-to-table @win-con)
+    (.setDecoration @change-to-table (last @table-cycle))
     ;; show the change to decoration
     (reset! change-to-decoration (set-decoration! @change-to-table))
     ;; initialize table
@@ -844,7 +836,6 @@
                                    @broom-offset)))
         table-cycle (r/cursor state [:table-cycle])
         cycle? (r/cursor state [:cycle?])
-        win-con (r/cursor state [:win-con])
         lives (r/cursor state [:lives])
         died? (r/cursor state [:died?])
         current-stage (r/cursor state [:current-stage])]
@@ -869,7 +860,7 @@
       (reset-occupation! @hero @tables)
       (set-decorations-cycle! @table-cycle @cycle? @tables)
       ;; is the stage won?
-      (when (stage-won? @tables @win-con)
+      (when (stage-won? @tables @table-cycle)
         ;; set to the next stage
         (set-stage! (next-stage))
         (reset! total-score @score)
@@ -1011,9 +1002,7 @@
         change-to-text (r/cursor state [:change-to-text])
         change-to-table (r/cursor state [:change-to-table])
         change-to-decoration (r/cursor state [:change-to-decoration])
-        win-con (r/cursor state [:win-con])
         table-cycle (r/cursor state [:table-cycle])
-        win-con (r/cursor state [:win-con])
         cycle? (r/cursor state [:cycle?])
         total-score (r/cursor state [:total-score])
         instructions (instructions)]
