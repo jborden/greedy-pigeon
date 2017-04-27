@@ -48,7 +48,7 @@
 
 (defn render
   [renderer scene camera]
-  (fn [] (.render renderer scene camera)))
+  (fn [] ($ renderer render scene camera)))
 
 (defn window-resize!
   "Update the renderer size and camera aspect based upon window size"

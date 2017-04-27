@@ -380,6 +380,39 @@
         ($! object3d :position.y y)
         (.updateBox this)))))
 
+(defn init-game-container
+  [state]
+  (let [scene (js/THREE.Scene.)
+        camera (display/init-camera!
+                (display/create-perspective-camera
+                 45
+                 (/ ($ js/window :innerWidth)
+                    ($ js/window :innerHeight))
+                 0.1
+                 20000)
+                scene
+                [0 0 2500])
+        renderer (display/create-renderer)
+        render-fn (display/render renderer scene camera)
+        paused? (r/cursor state [:paused?])]
+    ;; put the basic display elements into state
+    (swap! state assoc
+           :scene scene
+           :camera camera
+           :render-fn render-fn)
+    ;; resize the view of the camera to match that of the viewport
+    (display/window-resize! renderer camera)
+    ;; add the game cointainer to the dom
+    (r/render
+     [:div {:id "root-node"}
+      [GameContainer {:renderer renderer
+                      :camera camera
+                      :state state}]
+      [PauseComponent {:paused? paused?
+                       :on-click (fn [event]
+                                   (reset! paused? false))}]]
+     ($ js/document getElementById "reagent-app"))))
+
 (defn set-tables
   "Given a vector of vectors, return a vector of tables in their proper places"
   [m]
@@ -578,6 +611,7 @@
     [{:id "play-again"
       :selected? true
       :on-click (fn [e]
+                  (init-game-container state)
                   (@(r/cursor state [:init-game])))}])))
 
 (defn init-game-won-screen
@@ -963,73 +997,42 @@
 
 (defn ^:export init-game
   "Function to setup and start the game"
-  []
-  (let [scene (js/THREE.Scene.)
-        camera (display/init-camera!
-                (display/create-perspective-camera
-                 45
-                 (/ ($ js/window :innerWidth)
-                    ($ js/window :innerHeight))
-                 0.1
-                 20000)
-                scene
-                [0 0 2500])
-        renderer (display/create-renderer)
-        render-fn (display/render renderer scene camera)
+  [state]
+  (let [scene (r/cursor state [:scene])
         time-fn (r/cursor state [:time-fn])
         hero (pigeon)
         broom (broom)
         boot (boot)
         font-atom (r/cursor state [:font])
         tables (set-tables (:stage @state))
-        paused? (r/cursor state [:paused?])
-        died? (r/cursor state [:died?])
-        died-ticks (r/cursor state [:died-ticks])
-        key-state (r/cursor state [:key-state])
-        key-state-tracker (r/cursor state [:key-state-tracker])
-        broom-ticks (r/cursor state [:broom-ticks])
-        shadow-ticks (r/cursor state [:shadow-ticks])
-        boot-ticks (r/cursor state [:boot-ticks])
-        broom-offset (r/cursor state [:broom-offset])
-        boot-offset (r/cursor state [:boot-offset])
-        hero-offset (r/cursor state [:hero-offset])
-        table-decorations (r/cursor state [:table-decorations])
         shadow (table-decoration @(r/cursor state [:shadow-black-texture]) 130 22)
         lives (r/cursor state [:lives])
         score (r/cursor state [:score])
         score-text (r/cursor state [:score-text])
-        stage-text (r/cursor state [:stage-text])
         change-to-text (r/cursor state [:change-to-text])
-        change-to-table (r/cursor state [:change-to-table])
-        change-to-decoration (r/cursor state [:change-to-decoration])
-        table-cycle (r/cursor state [:table-cycle])
-        cycle? (r/cursor state [:cycle?])
         total-score (r/cursor state [:total-score])
         instructions (instructions)]
     ($ js/createjs Sound.stop "greedy_pigeon_theme")
     ($ js/createjs Sound.play "greedy_pigeon_theme")
     (swap! state assoc
-           :render-fn render-fn
            :hero hero
            :broom broom
            :boot boot
            :tables tables
-           :shadow shadow
-           :scene scene
-           :camera camera)
+           :shadow shadow)
     (.updateBox hero)
     (.updateBox broom)
     (.updateBox boot)
-    ($ scene add (.getObject3d hero))
-    ($ scene add (.getObject3d broom))
-    ($ scene add (.getObject3d boot))
-    ($ scene add (.getObject3d shadow))
+    ($ @scene add (.getObject3d hero))
+    ($ @scene add (.getObject3d broom))
+    ($ @scene add (.getObject3d boot))
+    ($ @scene add (.getObject3d shadow))
     (reset! lives 3)
     (reset! score 0)
     (reset! total-score 0)
     ;; add the tables to the scene
     (doall (map (fn [table]
-                  ($ scene add (.getObject3d table))) tables))
+                  ($ @scene add (.getObject3d table))) tables))
     ;; show lives total
     (show-lives! state)
     ;; set the score text
@@ -1037,23 +1040,13 @@
     ;; show the change to menu text
     (reset! change-to-text (text font-atom "Change To"))
     (.moveTo @change-to-text -1170 350)
-    ($ scene add (.getObject3d @change-to-text))
+    ($ @scene add (.getObject3d @change-to-text))
     (reset! time-fn (game-fn))
     ;; set the proper stage
     (set-stage! 0)
     (init-stage state)
     ;; add the instructions
-    ($ scene add instructions)
-    (display/window-resize! renderer camera)
-    (r/render
-     [:div {:id "root-node"}
-      [GameContainer {:renderer renderer
-                      :camera camera
-                      :state state}]
-      [PauseComponent {:paused? paused?
-                       :on-click (fn [event]
-                                   (reset! paused? false))}]]
-     ($ js/document getElementById "reagent-app"))))
+    ($ @scene add instructions)))
 
 (defn load-sound!
   []
@@ -1079,8 +1072,32 @@
   []
   (let [font (r/cursor state [:font])]
     (fn [delta-t]
-      (when ($ js/createjs Sound.loadComplete "greedy_pigeon_theme")
-        (init-game)))))
+      #_ (when ($ js/createjs Sound.loadComplete "greedy_pigeon_theme")
+           (init-game))
+      (when-not (nil? @font)
+        (init-game state)))))
+
+(defn sound-loader
+  [url state]
+  (let [camera (r/cursor state [:camera])
+        scene (r/cursor state [:scene])
+        audio-listener (js/THREE.AudioListener.)
+        sound (js/THREE.Audio. audio-listener)
+        loader (js/THREE.AudioLoader.)]
+    ($ camera add audio-listener)
+    ($ camera add sound)
+    ($ loader load
+       url
+       (fn [audio-buffer]
+         ($ sound setBuffer audio-buffer))
+       ;; fn called when download progresses
+       (fn [xhr]
+         (.log js/console (* (/ ($ xhr :loaded)
+                                ($ xhr :total))
+                             100) "% loaded"))
+       ;; fn called when download error
+       (fn [xhr]
+         (.log js/console "An error occured when loading " url)))))
 
 (defn load-game-assets
   []
@@ -1128,6 +1145,7 @@
                      [{:id "start"
                        :selected? true
                        :on-click (fn [e]
+                                   (init-game-container state)
                                    (load-game-assets))}])))
 
 (defn ^:export init-title-screen
@@ -1154,7 +1172,7 @@
     ;; start controls listeners
     (controls/initialize-key-listeners! key-state)
     ;; set init-fn's
-    (reset! init-game-fn init-game)
+    (reset! init-game-fn (partial init-game state))
     (reset! init-title-screen-fn init-title-screen)
     ;; start the loop
     (time-loop/start-time-loop time-fn)
