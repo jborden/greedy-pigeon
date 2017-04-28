@@ -1099,6 +1099,21 @@
        (fn [xhr]
          (.log js/console "An error occured when loading " url)))))
 
+(defn texture-loader
+  [url state]
+  (let [textures (r/cursor state [:textures])
+        loader (js/THREE.TextureLoader.)]
+    ($ loader load
+       url
+       (fn [texture]
+         (reset! textures assoc
+                 url texture))
+       (fn [xhr]
+         (.log js/console (* 100 (/ ($ xhr :loaded)
+                                    ($ xhr :total))) url "% loaded"))
+       (fn [xhr]
+         (.log js/console "An error occured when loaded " url)))))
+
 (defn load-game-assets
   []
   (let [font-url "fonts/helvetiker_regular.typeface.json"
