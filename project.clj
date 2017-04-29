@@ -18,6 +18,8 @@
                                    :output-to "resources/public/js/greedy_pigeon.js"
                                    :output-dir "resources/public/js/out"
                                    :asset-path "js/out"
+                                   :foreign-libs [{:file "resources/js/howler.core.min.js"
+                                                   :provides ["howler"]}]
                                    :optimizations :none
                                    :pretty-print true
                                    :source-map true}}
@@ -26,5 +28,7 @@
                         :compiler {:output-to "resources/public/js/greedy_pigeon.min.js"
                                    :optimizations :advanced
                                    :pretty-print false
+                                   :foreign-libs [{:file "resources/js/howler.core.min.js"
+                                                   :provides ["howler"]}]
                                    :externs ["src/js/greedy_pigeon.externs.js"]}}]}
   :target-path "target")

@@ -3,6 +3,8 @@
   (:require [reagent.core :as r]
             [cljsjs.three]
             [cljsjs.soundjs]
+            [howler]
+            [goog.string.path]
             [greedy-pigeon.components :refer [PauseComponent TitleScreen GameContainer GameWonScreen GameLostScreen]]
             [greedy-pigeon.controls :as controls]
             [greedy-pigeon.display :as display]
@@ -35,20 +37,6 @@
                      [1 0 1 0 1 0 1 0 1 0 1 0 1]]
                     :table-height 200
                     :table-width 200
-                    :table-texture nil
-                    :hero-texture nil
-                    :broom-texture nil
-                    :coins-small-texture nil
-                    :coins-big-texture nil
-                    :poop-small-texture nil
-                    :poop-medium-texture nil
-                    :poop-big-texture nil
-                    :cash-small-texture nil
-                    :cash-lots-texture nil
-                    :cash-and-coins-texture nil
-                    :shadow-grey-texture nil
-                    :shadow-black-texture nil
-                    :boot-texture nil
                     :table-decorations nil
                     :broom-offset 160
                     :hero-offset 90
@@ -67,9 +55,44 @@
                     :change-to-decoration nil
                     :background-overlay nil
                     :current-stage nil
-                    :stage-text nil})
+                    :stage-text nil
+                    :loaded-sounds nil})
 
 (defonce state (r/atom initial-state))
+
+(def texture-urls ["images/table_red.png"
+                   "images/pigeon_right_a.png"
+                   "images/broom.png"
+                   "images/boot_a.png"
+                   "images/coins_small.png"
+                   "images/coins_big.png"
+                   "images/poop_small.png"
+                   "images/poop_medium.png"
+                   "images/poop_big.png"
+                   "images/shadow_grey.png"
+                   "images/shadow_black.png"
+                   "images/cash_small.png"
+                   "images/cash_lots.png"
+                   "images/cash_and_coins.png"])
+
+(def sound-urls ["audio/moveclick1.mp3"
+                 "audio/moveclick2.mp3"
+                 "audio/moveclick3.mp3"
+                 "audio/moveclick4.mp3"
+                 "audio/moveclick5.mp3"
+                 "audio/no.mp3"
+                 "audio/ohno1.mp3"
+                 "audio/ooh_long.mp3"
+                 "audio/oui.mp3"
+                 "audio/oui_haha.mp3"
+                 "audio/smash.mp3"
+                 "audio/sweep.mp3"
+                 "audio/youve_died.mp3"
+                 "audio/ahha1.mp3"
+                 "audio/ahha2.mp3"
+                 "audio/gameover.mp3"
+                 "audio/greedy_pigeon_theme.mp3"
+                 ])
 
 (def stages
   [{:table-cycle ["cash-small" "none"]
@@ -95,7 +118,7 @@
 
 (defn broom
   []
-  (let [texture @(r/cursor state [:broom-texture])
+  (let [texture @(r/cursor state [:textures "broom.png"])
         geometry (js/THREE.PlaneGeometry. 80 240 1)
         material (js/THREE.MeshBasicMaterial.
                   (clj->js {:map texture
@@ -135,7 +158,7 @@
 
 (defn boot
   []
-  (let [texture @(r/cursor state [:boot-texture])
+  (let [texture @(r/cursor state [:textures "boot_a.png"])
         geometry (js/THREE.PlaneGeometry. 140 160 1)
         material (js/THREE.MeshBasicMaterial.
                   (clj->js {:map texture
@@ -175,7 +198,7 @@
 
 (defn pigeon
   []
-  (let [texture @(r/cursor state [:hero-texture])
+  (let [texture @(r/cursor state [:textures "pigeon_right_a.png"])
         geometry (js/THREE.PlaneGeometry. 150 150 1)
         material (js/THREE.MeshBasicMaterial.
                   (clj->js {:map texture
@@ -261,47 +284,47 @@
 
 (defn coins-small-decoration
   []
-  (table-decoration (:coins-small-texture @state)
+  (table-decoration @(r/cursor state [:textures "coins_small.png"])
                     120 60))
 
 (defn cash-small-decoration
   []
-  (table-decoration (:cash-small-texture @state)
+  (table-decoration @(r/cursor state [:textures "cash_small.png"])
                     120 60))
 
 (defn cash-lots-decoration
   []
-  (table-decoration (:cash-lots-texture @state)
+  (table-decoration @(r/cursor state [:textures "cash_lots.png"])
                     120 60))
 
 (defn cash-and-coins-decoration
   []
-  (table-decoration (:cash-and-coins-texture @state)
+  (table-decoration @(r/cursor state [:textures "cash_and_coins.png"])
                     120 60))
 
 (defn coins-big-decoration
   []
-  (table-decoration (:coins-big-texture @state)
+  (table-decoration @(r/cursor state [:textures "coins_big.png"])
                     120 60))
 
 (defn poop-small-decoration
   []
-  (table-decoration (:poop-small-texture @state)
+  (table-decoration @(r/cursor state [:textures "poop_small.png"])
                     60 30))
 
 (defn poop-medium-decoration
   []
-  (table-decoration (:poop-medium-texture @state)
+  (table-decoration @(r/cursor state [:textures "poop_medium.png"])
                     100 50))
 
 (defn poop-big-decoration
   []
-  (table-decoration (:poop-big-texture @state)
+  (table-decoration @(r/cursor state [:textures "poop_big.png"])
                     150 75))
 
 (defn table
   []
-  (let [texture @(r/cursor state [:table-texture])
+  (let [texture @(r/cursor state [:textures "table_red.png"])
         geometry (js/THREE.PlaneGeometry. @(r/cursor state [:table-width]) @(r/cursor state [:table-height]) 1)
         material (js/THREE.MeshBasicMaterial. 
                   (clj->js {:map texture
@@ -379,6 +402,14 @@
         ($! object3d :position.x x)
         ($! object3d :position.y y)
         (.updateBox this)))))
+
+(defn play-sound
+  [state filename]
+  ($ @(r/cursor state [:sounds filename]) play))
+
+(defn stop-sound
+  [state filename]
+  ($ @(r/cursor state [:sounds filename]) stop))
 
 (defn init-game-container
   [state]
@@ -861,8 +892,7 @@
                        (set-decorations! @tables @table-decorations state)
                        ;; reset the score
                        (reset-score! state (+ @total-score (calculate-score state)))
-                       ;; redraw the score
-                       ($ js/createjs Sound.play "moveclick5")))
+                       (play-sound state "moveclick5.mp3")))
         move-broom! (fn [broom table]
                       (.moveTo broom
                                ($ (.getObject3d table) :position.x)
@@ -898,7 +928,7 @@
         ;; set to the next stage
         (set-stage! (next-stage))
         (reset! total-score @score)
-        ($ js/createjs Sound.play "oui_haha")
+        (play-sound state "oui_haha.mp3")
         (init-stage state))
       ;; set the allowed directions
       (reset! hero-allowed-directions (allowed-directions (occupied-table @hero @tables) @tables))
@@ -967,24 +997,24 @@
         (when (= (occupied-table @hero @tables)
                  (occupied-table @broom @tables))
           (when (= @lives 0)
-            ($ js/createjs Sound.stop "greedy_pigeon_theme")
-            ($ js/createjs Sound.play "gameover")
+            (stop-sound state "greedy_pigeon_theme.mp3")
+            (play-sound state "gameover.mp3")
             (reset! died? true)
             (init-game-lost-screen "images/broomed.png"))
           (when (> @lives 0)
-            ($ js/createjs Sound.play "ohno1")
+            (play-sound state "ohno1.mp3")
             (swap! lives dec)
             (show-lives! state)
             (reset! died? true)))
         (when (= (occupied-table @hero @tables)
                  (occupied-table @boot @tables))
           (when (= @lives 0)
-            ($ js/createjs Sound.stop "greedy_pigeon_theme")
-            ($ js/createjs Sound.play "gameover")
+            (stop-sound state "greedy_pigeon_theme.mp3")
+            (play-sound state "gameover.mp3")
             (reset! died? true)
             (init-game-lost-screen "images/smashed.png"))
           (when (> @lives 0)
-            ($ js/createjs Sound.play "no")
+            (play-sound state "no.mp3")
             (swap! lives dec)
             (show-lives! state)
             (reset! died? true))))
@@ -1005,15 +1035,16 @@
         boot (boot)
         font-atom (r/cursor state [:font])
         tables (set-tables (:stage @state))
-        shadow (table-decoration @(r/cursor state [:shadow-black-texture]) 130 22)
+        shadow (table-decoration @(r/cursor state [:textures "shadow_black.png"]) 130 22)
         lives (r/cursor state [:lives])
         score (r/cursor state [:score])
         score-text (r/cursor state [:score-text])
         change-to-text (r/cursor state [:change-to-text])
         total-score (r/cursor state [:total-score])
         instructions (instructions)]
-    ($ js/createjs Sound.stop "greedy_pigeon_theme")
-    ($ js/createjs Sound.play "greedy_pigeon_theme")
+    (stop-sound state "gameover.mp3")
+    (stop-sound state "greedy_pigeon_theme.mp3")
+    (play-sound state "greedy_pigeon_theme.mp3")
     (swap! state assoc
            :hero hero
            :broom broom
@@ -1048,69 +1079,50 @@
     ;; add the instructions
     ($ @scene add instructions)))
 
-(defn load-sound!
-  []
-  ($ js/createjs Sound.registerSound "audio/moveclick1.mp3" "moveclick1")
-  ($ js/createjs Sound.registerSound "audio/moveclick2.mp3" "moveclick2")
-  ($ js/createjs Sound.registerSound "audio/moveclick3.mp3" "moveclick3")
-  ($ js/createjs Sound.registerSound "audio/moveclick4.mp3" "moveclick4")
-  ($ js/createjs Sound.registerSound "audio/moveclick5.mp3" "moveclick5")
-  ($ js/createjs Sound.registerSound "audio/no.mp3" "no")
-  ($ js/createjs Sound.registerSound "audio/ohno1.mp3" "ohno1")
-  ($ js/createjs Sound.registerSound "audio/ooh_long.mp3" "ooh_long")
-  ($ js/createjs Sound.registerSound "audio/oui.mp3" "oui")
-  ($ js/createjs Sound.registerSound "audio/oui_haha.mp3" "oui_haha")
-  ($ js/createjs Sound.registerSound "audio/smash.mp3" "smash")
-  ($ js/createjs Sound.registerSound "audio/sweep.mp3" "sweep")
-  ($ js/createjs Sound.registerSound "audio/youve_died.mp3" "youve_died")
-  ($ js/createjs Sound.registerSound "audio/ahha1.mp3" "ahha1")
-  ($ js/createjs Sound.registerSound "audio/ahha2.mp3" "ahha2")
-  ($ js/createjs Sound.registerSound "audio/gameover.mp3" "gameover")
-  ($ js/createjs Sound.registerSound "audio/greedy_pigeon_theme.mp3" "greedy_pigeon_theme"))
 
 (defn load-assets-fn
   []
-  (let [font (r/cursor state [:font])]
+  (let [font (r/cursor state [:font])
+        textures (r/cursor state [:textures])
+        sounds (r/cursor state [:sounds])]
     (fn [delta-t]
-      #_ (when ($ js/createjs Sound.loadComplete "greedy_pigeon_theme")
-           (init-game))
-      (when-not (nil? @font)
+      (when (and (not (nil? @font))
+                 (= (count @textures)
+                    (count texture-urls))
+                 (every? true? (map #(= ($ % state)
+                                        "loaded")
+                                    (vals @sounds))))
         (init-game state)))))
 
 (defn sound-loader
-  [url state]
-  (let [camera (r/cursor state [:camera])
-        scene (r/cursor state [:scene])
-        audio-listener (js/THREE.AudioListener.)
-        sound (js/THREE.Audio. audio-listener)
-        loader (js/THREE.AudioLoader.)]
-    ($ camera add audio-listener)
-    ($ camera add sound)
-    ($ loader load
-       url
-       (fn [audio-buffer]
-         ($ sound setBuffer audio-buffer))
-       ;; fn called when download progresses
-       (fn [xhr]
-         (.log js/console (* (/ ($ xhr :loaded)
-                                ($ xhr :total))
-                             100) "% loaded"))
-       ;; fn called when download error
-       (fn [xhr]
-         (.log js/console "An error occured when loading " url)))))
+  [state url]
+  (let [path js/goog.string.path
+        ;;        filename ($ js/goog string.path.baseName url)
+        filename ($ path baseName url)
+        sounds (r/cursor state [:sounds])
+        sound (js/Howl. (clj->js {:src [url]}))]
+    (swap! sounds assoc filename sound)))
 
 (defn texture-loader
-  [url state]
+  [state url]
   (let [textures (r/cursor state [:textures])
-        loader (js/THREE.TextureLoader.)]
+        loader (js/THREE.TextureLoader.)
+        path js/goog.string.path
+        filename ($ path baseName url)]
     ($ loader load
        url
        (fn [texture]
-         (reset! textures assoc
-                 url texture))
+         (swap! textures assoc
+                filename texture))
+       ;; onLoad and onProgress don't work in THREE.js
+       ;; but kept because they appear in
+       ;; https://threejs.org/docs/#api/loaders/TextureLoader
+       ;; for reasons why, see
+       ;; see: https://github.com/mrdoob/three.js/issues/7734
+       ;;      https://github.com/mrdoob/three.js/issues/10439
        (fn [xhr]
-         (.log js/console (* 100 (/ ($ xhr :loaded)
-                                    ($ xhr :total))) url "% loaded"))
+         (.log js/console (str (* 100 (/ ($ xhr :loaded)
+                                         ($ xhr :total)))) url "% loaded"))
        (fn [xhr]
          (.log js/console "An error occured when loaded " url)))))
 
@@ -1119,36 +1131,12 @@
   (let [font-url "fonts/helvetiker_regular.typeface.json"
         font-atom (r/cursor state [:font])
         time-fn (r/cursor state [:time-fn])
-        table-texture (r/cursor state [:table-texture])
-        hero-texture (r/cursor state [:hero-texture])
-        broom-texture (r/cursor state [:broom-texture])
-        coins-small-texture (r/cursor state [:coins-small-texture])
-        coins-big-texture (r/cursor state [:coins-big-texture])
-        poop-small-texture (r/cursor state [:poop-small-texture])
-        poop-medium-texture (r/cursor state [:poop-medium-texture])
-        poop-big-texture (r/cursor state [:poop-big-texture])
-        boot-texture (r/cursor state [:boot-texture])
-        shadow-grey-texture (r/cursor state [:shadow-grey-texture])
-        shadow-black-texture (r/cursor state [:shadow-black-texture])
-        cash-small-texture (r/cursor state [:cash-small-texture])
-        cash-lots-texture (r/cursor state [:cash-lots-texture])
-        cash-and-coins-texture (r/cursor state [:cash-and-coins-texture])]
-    (reset! table-texture (js/THREE.ImageUtils.loadTexture. "images/table_red.png"))
-    (reset! hero-texture (js/THREE.ImageUtils.loadTexture. "images/pigeon_right_a.png"))
-    (reset! broom-texture (js/THREE.ImageUtils.loadTexture. "images/broom.png"))
-    (reset! coins-small-texture (js/THREE.ImageUtils.loadTexture. "images/coins_small.png"))
-    (reset! coins-big-texture (js/THREE.ImageUtils.loadTexture. "images/coins_big.png"))
-    (reset! poop-small-texture (js/THREE.ImageUtils.loadTexture. "images/poop_small.png"))
-    (reset! poop-medium-texture (js/THREE.ImageUtils.loadTexture. "images/poop_medium.png"))
-    (reset! poop-big-texture (js/THREE.ImageUtils.loadTexture. "images/poop_big.png"))
-    (reset! shadow-grey-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_grey.png"))
-    (reset! shadow-black-texture (js/THREE.ImageUtils.loadTexture. "images/shadow_black.png"))
-    (reset! boot-texture (js/THREE.ImageUtils.loadTexture. "images/boot_a.png"))
-    (reset! cash-small-texture (js/THREE.ImageUtils.loadTexture. "images/cash_small.png"))
-    (reset! cash-lots-texture (js/THREE.ImageUtils.loadTexture. "images/cash_lots.png"))
-    (reset! cash-and-coins-texture (js/THREE.ImageUtils.loadTexture. "images/cash_and_coins.png"))
+        sounds (r/cursor state [:sounds])]
+    (doall (map (partial texture-loader state) texture-urls))
+    (when ((comp not nil?) @sounds)
+      (doall (map #($ % unload) (vals @sounds))))
+    (doall (map (partial sound-loader state) sound-urls))
     (load-font! font-url font-atom)
-    (load-sound!)
     (reset! time-fn (load-assets-fn))))
 
 
