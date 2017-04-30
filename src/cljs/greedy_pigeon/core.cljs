@@ -96,9 +96,9 @@
 
 (def stages
   [{:table-cycle ["cash-small" "none"]
-    :cycle? false}
+    :cycle? true}
    {:table-cycle ["cash-small" "poop-medium"]
-    :cycle? false}
+    :cycle? true}
    {:table-cycle ["cash-lots" "cash-small" "poop-medium"]
     :cycle? false}
    {:table-cycle ["cash-and-coins" "cash-lots" "cash-small" "none"]
@@ -326,7 +326,7 @@
   []
   (let [texture @(r/cursor state [:textures "table_red.png"])
         geometry (js/THREE.PlaneGeometry. @(r/cursor state [:table-width]) @(r/cursor state [:table-height]) 1)
-        material (js/THREE.MeshBasicMaterial. 
+        material (js/THREE.MeshBasicMaterial.
                   (clj->js {:map texture
                             :side js/THREE.DoubleSide
                             :transparent true}))
