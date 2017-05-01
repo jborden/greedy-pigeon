@@ -7,6 +7,4 @@
   []
   (core/load-game-assets)
   (r/unmount-component-at-node ($ js/document getElementById "reagent-app"))
-  ;;(core/play-again-fn)
-  (core/init-game-container core/state)
-  (@(r/cursor core/state [:init-game])))
+  (core/init-game-container core/state))

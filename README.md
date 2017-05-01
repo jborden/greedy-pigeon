@@ -11,6 +11,23 @@ Works best with Chrome.
 
 On Mac/Linux, installing node.js using [Node Version Manager](https://github.com/creationix/nvm) is recommended.
 
+## Prerequisites
+
+* Install Java for your system
+
+* on macOS, it is recomended to install [homebrew](https://brew.sh/)
+
+lein and npm can then be installed with
+
+```bash
+$ brew install leiningen
+```
+
+```bash
+$ brew install npm
+```
+
+
 ## Initial setup
 
 Compile the development version of the application:
@@ -19,12 +36,24 @@ Compile the development version of the application:
 $ lein cljsbuild once dev
 ```
 
+Install the portfinder, connect and serve-static libraries
+```bash
+$ npm i -S portfinder connect serve-static
+```
+
 Run the node server:
 ```bash
 $ node resources/public/server.js
 ```
 
 Point your browser to the url indicated on the command line.
+
+**development**
+
+http://localhost:8000
+
+**release**
+http://localhost:800/index_release.html
 
 ## Figwheel
 

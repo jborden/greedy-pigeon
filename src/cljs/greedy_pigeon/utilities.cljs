@@ -1,5 +1,6 @@
 (ns greedy-pigeon.utilities
-  (:require-macros [reagent.interop :refer [$ $!]]))
+  (:require-macros [reagent.interop :refer [$ $!]])
+  (:require [goog.string.path]))
 
 (defn calculate-distance
   "Given two THREE.Object3d objects, calculate the distance between them"
@@ -34,3 +35,9 @@
         (find-nearest-object target (rest object-pool) nearest-object) ;; nearest object still closer
         (find-nearest-object target (rest object-pool) next-object) ;; the next object was closer
         ))))
+
+(defn url->filename
+  "Given a url return the filename"
+  [url]
+  (let [path js/goog.string.path]
+    ($ path baseName url)))

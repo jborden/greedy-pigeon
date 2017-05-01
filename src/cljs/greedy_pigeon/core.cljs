@@ -4,15 +4,15 @@
             [cljsjs.three]
             [cljsjs.soundjs]
             [howler]
-            [goog.string.path]
-            [greedy-pigeon.components :refer [PauseComponent TitleScreen GameContainer GameWonScreen GameLostScreen]]
+            [greedy-pigeon.components :refer [AssetLoadingComponent PauseComponent TitleScreen GameContainer GameWonScreen GameLostScreen]]
             [greedy-pigeon.controls :as controls]
             [greedy-pigeon.display :as display]
             [greedy-pigeon.menu :as menu]
             [greedy-pigeon.time-loop :as time-loop]
             [greedy-pigeon.utilities :as utilities]))
 
-(def initial-state {:paused? false
+(def initial-state {:assets-loaded-percent nil
+                    :paused? false
                     :died? false
                     :died-broom? false
                     :died-boot? false
@@ -24,9 +24,6 @@
                     :init-play-again-fn (constantly true)
                     :init-title-screen-fn (constantly true)
                     :font nil
-                    :table-cycle nil
-                    :win-con nil
-                    :cycle? false
                     :stage
                     [[0 0 0 0 0 0 1 0 0 0 0 0 0]
                      [0 0 0 0 0 1 0 1 0 0 0 0 0]
@@ -55,8 +52,7 @@
                     :change-to-decoration nil
                     :background-overlay nil
                     :current-stage nil
-                    :stage-text nil
-                    :loaded-sounds nil})
+                    :stage-text nil})
 
 (defonce state (r/atom initial-state))
 
@@ -93,6 +89,8 @@
                  "audio/gameover.mp3"
                  "audio/greedy_pigeon_theme.mp3"
                  ])
+
+(def font-urls ["fonts/helvetiker_regular.typeface.json"])
 
 (def stages
   [{:table-cycle ["cash-small" "none"]
@@ -251,14 +249,6 @@
         _ ($! object3d :position.z 1)]
     object3d))
 
-(defn load-font!
-  [url font-atom]
-  ($ (js/THREE.FontLoader.)
-     load
-     url
-     (fn [font]
-       (reset! font-atom font))))
-
 (defn table-decoration
   [texture height width]
   (let [geometry (js/THREE.PlaneGeometry. height width 1)
@@ -376,9 +366,9 @@
         (reset! decoration name)))))
 
 (defn text
-  [font-atom text & [color]]
+  [font text & [color]]
   (let [geometry (js/THREE.TextGeometry. text
-                                         (clj->js {:font @font-atom
+                                         (clj->js {:font @(r/cursor state [:fonts font])
                                                    :size 50
                                                    :height 10}))
         material (js/THREE.MeshBasicMaterial. (clj->js {:color (or color 0xD4AF37)}))
@@ -425,6 +415,7 @@
                 [0 0 2500])
         renderer (display/create-renderer)
         render-fn (display/render renderer scene camera)
+        assets-loaded-percent (r/cursor state [:assets-loaded-percent])
         paused? (r/cursor state [:paused?])]
     ;; put the basic display elements into state
     (swap! state assoc
@@ -441,8 +432,10 @@
                       :state state}]
       [PauseComponent {:paused? paused?
                        :on-click (fn [event]
-                                   (reset! paused? false))}]]
+                                   (reset! paused? false))}]
+      [AssetLoadingComponent {:assets-loaded-percent assets-loaded-percent}]]
      ($ js/document getElementById "reagent-app"))))
+
 
 (defn set-tables
   "Given a vector of vectors, return a vector of tables in their proper places"
@@ -486,11 +479,10 @@
         tables (set-tables table-arrangement)
         pigeon (pigeon)
         group (js/THREE.Group.)
-        font-atom (r/cursor state [:font])
-        up (text font-atom "W" 0xFFFFFF)
-        left (text font-atom "A" 0xFFFFFF)
-        down (text font-atom "S" 0xFFFFFF)
-        right (text font-atom "D" 0xFFFFFF)]
+        up (text "helvetiker_regular.typeface.json" "W" 0xFFFFFF)
+        left (text "helvetiker_regular.typeface.json" "A" 0xFFFFFF)
+        down (text "helvetiker_regular.typeface.json" "S" 0xFFFFFF)
+        right (text "helvetiker_regular.typeface.json" "D" 0xFFFFFF)]
     (.moveTo pigeon 1000 200)
     (.moveTo up 1160 425)
     (.moveTo left 770 425)
@@ -728,11 +720,10 @@
   [state new-score]
   (let [score (r/cursor state [:score])
         score-text (r/cursor state [:score-text])
-        scene (r/cursor state [:scene])
-        font-atom (r/cursor state [:font])]
+        scene (r/cursor state [:scene])]
     (reset! score new-score)
     ($ @scene remove (.getObject3d @score-text))
-    (reset! score-text (text font-atom @score))
+    (reset! score-text (text "helvetiker_regular.typeface.json" @score))
     (.moveTo @score-text -1200 700)
     ($ @scene add (.getObject3d @score-text))))
 
@@ -741,12 +732,11 @@
   [n]
   (let [current-stage (r/cursor state [:current-stage])
         stage-text (r/cursor state [:stage-text])
-        scene (r/cursor state [:scene])
-        font-atom (r/cursor state [:font])]
+        scene (r/cursor state [:scene])]
     (reset! current-stage n)
     (when ((comp not nil?) @stage-text)
       ($ @scene remove (.getObject3d @stage-text)))
-    (reset! stage-text (text font-atom (str "Stage " (+ @current-stage 1))))
+    (reset! stage-text (text "helvetiker_regular.typeface.json" (str "Stage " (+ @current-stage 1))))
     (.moveTo @stage-text -1200 600)
     ($ @scene add (.getObject3d @stage-text))))
 
@@ -776,7 +766,6 @@
         broom (r/cursor state [:broom])
         boot (r/cursor state [:boot])
         shadow (r/cursor state [:shadow])
-        font-atom (r/cursor state [:font])
         tables (r/cursor state [:tables])
         paused? (r/cursor state [:paused?])
         died? (r/cursor state [:died?])
@@ -1033,7 +1022,6 @@
         hero (pigeon)
         broom (broom)
         boot (boot)
-        font-atom (r/cursor state [:font])
         tables (set-tables (:stage @state))
         shadow (table-decoration @(r/cursor state [:textures "shadow_black.png"]) 130 22)
         lives (r/cursor state [:lives])
@@ -1067,9 +1055,9 @@
     ;; show lives total
     (show-lives! state)
     ;; set the score text
-    (reset! score-text (text font-atom @score))
+    (reset! score-text (text "helvetiker_regular.typeface.json" @score))
     ;; show the change to menu text
-    (reset! change-to-text (text font-atom "Change To"))
+    (reset! change-to-text (text "helvetiker_regular.typeface.json" "Change To"))
     (.moveTo @change-to-text -1170 350)
     ($ @scene add (.getObject3d @change-to-text))
     (reset! time-fn (game-fn))
@@ -1079,41 +1067,55 @@
     ;; add the instructions
     ($ @scene add instructions)))
 
+(defn percent-assets-loaded
+  "Return the total amount of assets that has been loaded"
+  []
+  (let [textures (r/cursor state [:textures])
+        sounds (r/cursor state [:sounds])
+        fonts (r/cursor state [:fonts])
+        percent-textures (/ (count @textures)
+                            (count texture-urls))
+        percent-sounds (/ (count (filter true? (map #(= ($ % state) "loaded") (vals @sounds))))
+                          (count sound-urls))
+        percent-fonts (/ (count @fonts)
+                         (count font-urls))]
+    (/ (+ percent-textures
+          percent-sounds
+          percent-fonts)
+       3)))
 
 (defn load-assets-fn
   []
-  (let [font (r/cursor state [:font])
-        textures (r/cursor state [:textures])
-        sounds (r/cursor state [:sounds])]
+  (let [assets-loaded-percent (r/cursor state [:assets-loaded-percent])]
     (fn [delta-t]
-      (when (and (not (nil? @font))
-                 (= (count @textures)
-                    (count texture-urls))
-                 (every? true? (map #(= ($ % state)
-                                        "loaded")
-                                    (vals @sounds))))
+      (reset! assets-loaded-percent (percent-assets-loaded))
+      (when (=  @assets-loaded-percent 1)
         (init-game state)))))
 
 (defn sound-loader
   [state url]
-  (let [path js/goog.string.path
-        ;;        filename ($ js/goog string.path.baseName url)
-        filename ($ path baseName url)
-        sounds (r/cursor state [:sounds])
+  (let [sounds (r/cursor state [:sounds])
         sound (js/Howl. (clj->js {:src [url]}))]
-    (swap! sounds assoc filename sound)))
+    (swap! sounds assoc (utilities/url->filename url) sound)))
+
+(defn font-loader
+  [state url]
+  (let [fonts (r/cursor state [:fonts])]
+    ($ (js/THREE.FontLoader.)
+       load
+       url
+       (fn [font]
+         (swap! fonts assoc (utilities/url->filename url) font)))))
 
 (defn texture-loader
   [state url]
   (let [textures (r/cursor state [:textures])
-        loader (js/THREE.TextureLoader.)
-        path js/goog.string.path
-        filename ($ path baseName url)]
+        loader (js/THREE.TextureLoader.)]
     ($ loader load
        url
        (fn [texture]
          (swap! textures assoc
-                filename texture))
+                (utilities/url->filename url) texture))
        ;; onLoad and onProgress don't work in THREE.js
        ;; but kept because they appear in
        ;; https://threejs.org/docs/#api/loaders/TextureLoader
@@ -1128,15 +1130,15 @@
 
 (defn load-game-assets
   []
-  (let [font-url "fonts/helvetiker_regular.typeface.json"
-        font-atom (r/cursor state [:font])
-        time-fn (r/cursor state [:time-fn])
-        sounds (r/cursor state [:sounds])]
+  (let [time-fn (r/cursor state [:time-fn])
+        sounds (r/cursor state [:sounds])
+        assets-loaded-percent (r/cursor state [:assets-loaded-percent])]
+    (reset! assets-loaded-percent 0)
+    (doall (map (partial font-loader state) font-urls))
     (doall (map (partial texture-loader state) texture-urls))
     (when ((comp not nil?) @sounds)
       (doall (map #($ % unload) (vals @sounds))))
     (doall (map (partial sound-loader state) sound-urls))
-    (load-font! font-url font-atom)
     (reset! time-fn (load-assets-fn))))
 
 
