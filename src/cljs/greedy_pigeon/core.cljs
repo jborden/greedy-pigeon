@@ -9,8 +9,7 @@
             [greedy-pigeon.display :as display]
             [greedy-pigeon.menu :as menu]
             [greedy-pigeon.time-loop :as time-loop]
-            [greedy-pigeon.utilities :as utilities]
-            [greedy-pigeon.xhr :as xhr]))
+            [greedy-pigeon.utilities :as utilities]))
 
 (def initial-state {:assets-loaded-percent nil
                     :paused? false

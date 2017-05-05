@@ -41,3 +41,7 @@
   [url]
   (let [path js/goog.string.path]
     ($ path baseName url)))
+
+(defn clj->json
+  [clj]
+  (js/JSON.stringify (clj->js clj)))
