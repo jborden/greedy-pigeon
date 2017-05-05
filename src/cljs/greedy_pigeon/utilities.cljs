@@ -2,6 +2,9 @@
   (:require-macros [reagent.interop :refer [$ $!]])
   (:require [goog.string.path]))
 
+(def leaderboard-url (-> ($ js/document getElementById "leaderboard-url")
+                         ($ getAttribute "value")))
+
 (defn calculate-distance
   "Given two THREE.Object3d objects, calculate the distance between them"
   [a b]

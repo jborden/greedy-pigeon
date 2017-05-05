@@ -7,6 +7,7 @@
             [greedy-pigeon.components :refer [AssetLoadingComponent PauseComponent TitleScreen GameContainer GameWonScreen GameLostScreen]]
             [greedy-pigeon.controls :as controls]
             [greedy-pigeon.display :as display]
+            [greedy-pigeon.leaderboard :as leaderboard]
             [greedy-pigeon.menu :as menu]
             [greedy-pigeon.time-loop :as time-loop]
             [greedy-pigeon.utilities :as utilities]))

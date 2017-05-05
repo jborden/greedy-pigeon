@@ -1,6 +1,6 @@
 (ns greedy-pigeon.leaderboard
   (:require [greedy-pigeon.xhr :as xhr]
-            [greedy-pigeon.utilities :refer [clj->json]]))
+            [greedy-pigeon.utilities :refer [clj->json leaderboard-url]]))
 
 (defn post-score-graphql
   [score-map game-key name]
