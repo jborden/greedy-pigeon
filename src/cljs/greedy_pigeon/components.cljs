@@ -4,6 +4,12 @@
             [reagent.core :as r]
             [greedy-pigeon.display :as display]))
 
+(defn ProcessingIcon
+  []
+  (fn []
+    [:i {:class "fa fa-lg fa-spinner fa-pulse "
+         :style {:color "black"}}]))
+
 (defn TitleScreen
   []
   (fn [{:keys [selected-menu-item]}]
@@ -150,15 +156,16 @@
 
 (defn MenuButton
   [props text]
-  (fn [{:keys [on-click id]}]
+  (fn [{:keys [on-click id]} text]
     [:a {:href "#"
          :id id
-         :on-click on-click
+         :on-click  on-click
          :class "menu-button"} text]))
 
 (defn GameOverMenu
   [props form]
   (fn [props form]
+    (.log js/console "GameOverMenu rendered")
     [:div {:id "menu"
            :style {:position "absolute"
                    :z-index "3"
@@ -169,7 +176,7 @@
      [:div {:id "module-padding"
             :style {:padding "0.5em"
                     :overflow "hidden"}}
-      form]]))
+      @form]]))
 
 (defn ScoreForm
   [props]
@@ -185,7 +192,9 @@
 (defn InputNameForm
   [props]
   (fn [{:keys [score stage name-on-change submit-fn restart-fn
-               game-name]}]
+               game-name retrieving?]}]
+    (.log js/console "InputNameForm rendered")
+    (.log js/console "retrieving?" @retrieving?)
     [:form {:id "username-form"
             :method "post"}
      [:h1 "Submit Score"]
@@ -195,14 +204,17 @@
                   :default-value "Foo"
                   :placeholder "Game Name"
                   :on-change name-on-change}]]
-     [MenuButton {:on-click submit-fn} "Submit"]
+     (if @retrieving?
+       [:div {:class "menu-button"} [ProcessingIcon]]
+       [MenuButton {:on-click (partial submit-fn score stage @game-name)}
+        "Submit"])
      [MenuButton {:on-click restart-fn} "Play Again"]]))
 
 (defn LeaderboardForm
   [props]
   (fn [{:keys [game-name submit-fn]}]
     [:form
-     [:h1 "Latest Entires"]
+     [:h1 "Latest Entries"]
      [:table
       [:tbody
        [:tr [:td "foo"] [:td "0"]]

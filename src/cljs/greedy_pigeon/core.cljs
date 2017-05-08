@@ -661,28 +661,60 @@
         current-stage (r/cursor state [:current-stage])
         game-name (r/atom "Foo Bar")
         ;; below goes into separate namespace, building here just for now
+        current-form (r/atom nil)
+        retrieving? (r/atom false)
+        leaderboard-form [LeaderboardForm {:submit-fn
+                                           (fn [e]
+                                             ($ e preventDefault)
+                                             (init-game-container state)
+                                             (@(r/cursor state [:init-game]))
+                                             )}]
+        input-name-form  [InputNameForm {:score @points
+                                         :stage (+ 1 @current-stage)
+                                         :name-on-change #(reset! game-name (utilities/get-input-value %))
+                                         :retrieving? retrieving?
+                                         :submit-fn (fn [score stage game-name e]
+                                                      ($ e preventDefault)
+                                                      (reset! retrieving? true)
+                                                      (leaderboard/post-score
+                                                       {:score score
+                                                        :stage stage}
+                                                       ;; this needs to be obtained from DOM
+                                                       "cb905938e03c465caf770d68c0f1dbda"
+                                                       game-name
+                                                       (fn [response]
+                                                         (reset! retrieving? false)
+                                                         (let [errors (:errors response)]
+                                                           (if (empty? errors)
+                                                             (reset! current-form  leaderboard-form)
+                                                             (.log js/console "there was an error: "
+                                                                   (:message (first errors))))))))
+                                         :restart-fn (fn [e]
+                                                       ($ e preventDefault)
+                                                       (init-game-container state)
+                                                       (@(r/cursor state [:init-game])))
+                                         :game-name game-name}]
+        score-form [ScoreForm {:score @points
+                               :restart-fn (fn [e]
+                                             ($ e preventDefault)
+                                             (init-game-container state)
+                                             (@(r/cursor state [:init-game])))
+                               :add-to-leaderboard-fn (fn [e]
+                                                        ($ e preventDefault)
+                                                        (reset! current-form input-name-form))}]
+
         ]
     (reset! key-state (:key-state initial-state))
     (reset! selected-menu-item "play-again")
     (reset! time-fn (play-again-fn))
+    (reset! current-form score-form)
     (r/render
      [:div
       [GameLostScreen {:selected-menu-item selected-menu-item
                        :url url
                        :stage (+ 1 @current-stage)
                        :score @points}]
-      [GameOverMenu {}
-       #_       [LeaderboardForm {}]
-       #_       [ScoreForm {:score @points
-                            :restart-fn #(do ($ % preventDefault))}]
-       #_      [InputNameForm {:score @points
-                               :stage (+ 1 @current-stage)
-                               :name-on-change #(reset! game-name (utilities/get-input-value %))
-                               :submit-fn #(do (.preventDefault %)
-                                               (.log js/console "I would have submitted"))
-                               :restart-fn #(do (.preventDefault %)
-                                                (.log js/console "I would have restarted"))
-                               :game-name game-name}]] ]
+      [GameOverMenu {} current-form]]
      ($ js/document getElementById "reagent-app"))))
 
 (defn show-lives!
