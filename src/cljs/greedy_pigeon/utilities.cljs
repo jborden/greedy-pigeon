@@ -48,3 +48,10 @@
 (defn clj->json
   [clj]
   (js/JSON.stringify (clj->js clj)))
+
+(defn get-input-value
+  "Get the field value of a form"
+  [field]
+  (-> field
+      ($ :target)
+      ($ :value)))

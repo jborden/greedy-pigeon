@@ -53,7 +53,9 @@
                     :width "100%"
                     :text-align "center"
                     :font-size "1.5em"}}
-      (str "You got to Stage " stage " with a Score of " score)]]))
+      (str "You got to Stage " stage " with a Score of " score)]
+
+     ]))
 
 (defn PauseComponent
   "Props is:
@@ -126,3 +128,94 @@
                                :style {:position "absolute"
                                        :left "0px"
                                        :top "0px"}}])})))
+
+(defn TextInput
+  "props is:
+  {
+  :value          ; str
+  :default-value  ; str
+  :placeholder    ; str, optional
+  :on-change      ; fn, fn to execute on change
+  }
+  "
+  [props]
+  (fn [{:keys [value default-value placeholder on-change]
+        :or {default-value ""}} props]
+    [:input {:type "text"
+             :class "form-control-purple"
+             :value value
+             :defaultValue default-value
+             :placeholder placeholder
+             :on-change on-change}]))
+
+(defn MenuButton
+  [props text]
+  (fn [{:keys [on-click id]}]
+    [:a {:href "#"
+         :id id
+         :on-click on-click
+         :class "menu-button"} text]))
+
+(defn GameOverMenu
+  [props form]
+  (fn [props form]
+    [:div {:id "menu"
+           :style {:position "absolute"
+                   :z-index "3"
+                   :left "35%"
+                   :top "15%"
+                   :color "red"
+                   :background-color "lightgrey"}}
+     [:div {:id "module-padding"
+            :style {:padding "0.5em"
+                    :overflow "hidden"}}
+      form]]))
+
+(defn ScoreForm
+  [props]
+  (fn [{:keys [score stage restart-fn add-to-leaderboard-fn]}]
+    [:form {:id "username-form"
+            :method "post"}
+     [:h1 "Your Score"]
+     [:h1 (str "Points " score)]
+     [:div
+      [MenuButton {:on-click restart-fn } "Play Again"]
+      [MenuButton {:on-click add-to-leaderboard-fn} "Add to Leaderboard"]]]))
+
+(defn InputNameForm
+  [props]
+  (fn [{:keys [score stage name-on-change submit-fn restart-fn
+               game-name]}]
+    [:form {:id "username-form"
+            :method "post"}
+     [:h1 "Submit Score"]
+     [:h1 (str "Points " score)]
+     [:div {:id "game-name-containers"}
+      [TextInput {:value @game-name
+                  :default-value "Foo"
+                  :placeholder "Game Name"
+                  :on-change name-on-change}]]
+     [MenuButton {:on-click submit-fn} "Submit"]
+     [MenuButton {:on-click restart-fn} "Play Again"]]))
+
+(defn LeaderboardForm
+  [props]
+  (fn [{:keys [game-name submit-fn]}]
+    [:form
+     [:h1 "Latest Entires"]
+     [:table
+      [:tbody
+       [:tr [:td "foo"] [:td "0"]]
+       [:tr [:td "bar"] [:td "1"]]
+       [:tr [:td "baz"] [:td "2"]]
+       [:tr [:td "qux"] [:td "3"]]
+       [:tr [:td "corge"] [:td "4"]]]]
+     [:h1 "Top Entries"]
+     [:table
+      [:tbody
+       [:tr [:td "foo"] [:td "500"]]
+       [:tr [:td "bar"] [:td "400"]]
+       [:tr [:td "baz"] [:td "300"]]
+       [:tr [:td "qux"] [:td "200"]]
+       [:tr [:td "corge"] [:td "100"]]]]
+     [MenuButton {:on-click submit-fn} "Back to Game"]]))

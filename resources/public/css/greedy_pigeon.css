@@ -73,3 +73,12 @@ body {
     text-align: center;
     cursor: pointer;
 }
+
+.menu-button {
+    display:block;
+    padding: 0.1em;
+    font-size: 1.5em;
+    text-align: center;
+    border: 5px solid white;
+    margin-top: 0.5em;
+}

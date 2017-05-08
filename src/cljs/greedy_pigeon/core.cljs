@@ -4,7 +4,7 @@
             [cljsjs.three]
             [cljsjs.soundjs]
             [howler]
-            [greedy-pigeon.components :refer [AssetLoadingComponent PauseComponent TitleScreen GameContainer GameWonScreen GameLostScreen]]
+            [greedy-pigeon.components :refer [AssetLoadingComponent PauseComponent TitleScreen GameContainer GameWonScreen GameLostScreen GameOverMenu InputNameForm ScoreForm LeaderboardForm]]
             [greedy-pigeon.controls :as controls]
             [greedy-pigeon.display :as display]
             [greedy-pigeon.leaderboard :as leaderboard]
@@ -657,16 +657,32 @@
   (let [time-fn (r/cursor state [:time-fn])
         key-state (r/cursor state [:key-state])
         selected-menu-item (r/cursor state [:selected-menu-item])
-        score (r/cursor state [:score])
-        current-stage (r/cursor state [:current-stage])]
+        points (r/cursor state [:score])
+        current-stage (r/cursor state [:current-stage])
+        game-name (r/atom "Foo Bar")
+        ;; below goes into separate namespace, building here just for now
+        ]
     (reset! key-state (:key-state initial-state))
     (reset! selected-menu-item "play-again")
     (reset! time-fn (play-again-fn))
     (r/render
-     [GameLostScreen {:selected-menu-item selected-menu-item
-                      :url url
-                      :stage (+ 1 @current-stage)
-                      :score @score}]
+     [:div
+      [GameLostScreen {:selected-menu-item selected-menu-item
+                       :url url
+                       :stage (+ 1 @current-stage)
+                       :score @points}]
+      [GameOverMenu {}
+       #_       [LeaderboardForm {}]
+       #_       [ScoreForm {:score @points
+                            :restart-fn #(do ($ % preventDefault))}]
+       #_      [InputNameForm {:score @points
+                               :stage (+ 1 @current-stage)
+                               :name-on-change #(reset! game-name (utilities/get-input-value %))
+                               :submit-fn #(do (.preventDefault %)
+                                               (.log js/console "I would have submitted"))
+                               :restart-fn #(do (.preventDefault %)
+                                                (.log js/console "I would have restarted"))
+                               :game-name game-name}]] ]
      ($ js/document getElementById "reagent-app"))))
 
 (defn show-lives!
@@ -1047,7 +1063,8 @@
     ($ @scene add (.getObject3d broom))
     ($ @scene add (.getObject3d boot))
     ($ @scene add (.getObject3d shadow))
-    (reset! lives 3)
+    ;;(reset! lives 3)
+    (reset! lives 0)
     (reset! score 0)
     (reset! total-score 0)
     ;; add the tables to the scene
