@@ -1,6 +1,6 @@
 (ns greedy-pigeon.leaderboard
   (:require [greedy-pigeon.xhr :as xhr]
-            [greedy-pigeon.utilities :refer [clj->json leaderboard-url]]))
+            [greedy-pigeon.utilities :as utilities :refer [clj->json leaderboard-url]]))
 
 (defn post-score-graphql-json
   [score-map game-key name]
@@ -12,10 +12,10 @@
                           :name name}}))
 
 (defn post-score
-  [score-map game-key name response-fn]
+  [score-map name response-fn]
   (xhr/retrieve-url leaderboard-url
                     "POST"
-                    (post-score-graphql-json score-map game-key name)
+                    (post-score-graphql-json score-map utilities/game-key name)
                     (xhr/process-json-response response-fn)))
 
 (defn get-recent-scores-graphql-json
@@ -26,10 +26,10 @@
               :variables {:game_key game-key}}))
 
 (defn get-recent-scores
-  [game-key response-fn]
+  [response-fn]
   (xhr/retrieve-url leaderboard-url
                     "POST"
-                    (get-recent-scores-graphql-json game-key)
+                    (get-recent-scores-graphql-json utilities/game-key)
                     (xhr/process-json-response response-fn)))
 
 (defn get-top-scores-graphql-json
@@ -41,8 +41,8 @@
                           :keyword keyword}}))
 
 (defn get-top-scores
-  [game-key keyword response-fn]
+  [keyword response-fn]
   (xhr/retrieve-url leaderboard-url
                     "POST"
-                    (get-top-scores-graphql-json game-key keyword)
+                    (get-top-scores-graphql-json utilities/game-key keyword)
                     (xhr/process-json-response response-fn)))

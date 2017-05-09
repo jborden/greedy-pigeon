@@ -230,8 +230,7 @@
 (defn LeaderboardForm
   [props]
   (fn [{:keys [game-name submit-fn]}]
-    (let [game-key "cb905938e03c465caf770d68c0f1dbda"
-          score-keyword "score"
+    (let [score-keyword "score"
           latest-entries (r/atom [])
           top-entries (r/atom [])]
       (r/create-class
@@ -239,12 +238,10 @@
 
         :component-did-mount
         (fn [this]
-          (leaderboard/get-recent-scores game-key
-                                         (fn [response]
+          (leaderboard/get-recent-scores (fn [response]
                                            (reset! latest-entries
                                                    (get-in response [:data :recentScores]))))
-          (leaderboard/get-top-scores game-key
-                                      score-keyword
+          (leaderboard/get-top-scores score-keyword
                                       (fn [response]
                                         (reset! top-entries (get-in response [:data :topScores])))))
 

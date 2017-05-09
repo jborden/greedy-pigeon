@@ -5,6 +5,9 @@
 (def leaderboard-url (-> ($ js/document getElementById "leaderboard-url")
                          ($ getAttribute "value")))
 
+(def game-key (-> ($ js/document getElementById "game-key")
+                  ($ getAttribute "value")))
+
 (defn calculate-distance
   "Given two THREE.Object3d objects, calculate the distance between them"
   [a b]

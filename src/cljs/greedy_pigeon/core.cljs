@@ -688,8 +688,6 @@
                                                       (leaderboard/post-score
                                                        {:score score
                                                         :stage stage}
-                                                       ;; this needs to be obtained from DOM
-                                                       "cb905938e03c465caf770d68c0f1dbda"
                                                        game-name
                                                        (fn [response]
                                                          (reset! retrieving? false)
