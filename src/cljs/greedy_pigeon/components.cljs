@@ -194,20 +194,32 @@
   [props]
   (fn [{:keys [score stage name-on-change submit-fn restart-fn
                game-name retrieving?]}]
-    [:form {:id "username-form"
-            :method "post"}
-     [:h1 "Submit Score"]
-     [:h1 (str "Points " score)]
-     [:div {:id "game-name-containers"}
-      [TextInput {:value @game-name
-                  :default-value "Foo"
-                  :placeholder "Game Name"
-                  :on-change name-on-change}]]
-     (if @retrieving?
-       [:div {:class "menu-button"} [ProcessingIcon]]
-       [MenuButton {:on-click (partial submit-fn score stage @game-name)}
-        "Submit"])
-     [MenuButton {:on-click restart-fn} "Play Again"]]))
+    (let [error? (r/atom false)]
+      [:form {:id "username-form"
+              :method "post"}
+       [:h1 "Submit Score"]
+       [:h1 (str "Points " score)]
+       [:div {:id "game-name-containers"}
+        [TextInput {:value @game-name
+                    :default-value "Foo"
+                    :placeholder "Game Name"
+                    :on-change (do (if (empty? @game-name)
+                                     (reset! error? true)
+                                     (reset! error? false))
+                                   name-on-change)}]
+        [:div {:id "error"
+               :style {:color "red"
+                       :display (if @error?
+                                  "block"
+                                  "none")}}
+         "Game Name can't be blank"]]
+       (if @retrieving?
+         [:div {:class "menu-button"} [ProcessingIcon]]
+         [MenuButton {:on-click (if @error?
+                                  #($ % preventDefault)
+                                  (partial submit-fn score stage @game-name))}
+          "Submit"])
+       [MenuButton {:on-click restart-fn} "Play Again"]])))
 
 (defn LeaderboardTableRow
   [row]
