@@ -47,23 +47,13 @@
 
 (defn GameLostScreen
   []
-  (fn [{:keys [url score stage]}]
+  (fn [{:keys [url]}]
     [:div {:id "title-screen"
            :style {:position "absolute"}}
      [:img {:src url
             :style {:margin "0 auto"
                     :height "inherit"
-                    :display "block"}}]
-     [:div {:style {:color "white"
-                    :position "absolute"
-                    :top "0"
-                    :margin "0 auto"
-                    :width "100%"
-                    :text-align "center"
-                    :font-size "1.5em"}}
-      (str "You got to Stage " stage " with a Score of " score)]
-
-     ]))
+                    :display "block"}}]]))
 
 (defn PauseComponent
   "Props is:
@@ -170,10 +160,12 @@
     [:div {:id "menu"
            :style {:position "absolute"
                    :z-index "3"
-                   :left "35%"
+                   :left "44%"
                    :top "15%"
                    :color "red"
-                   :background-color "lightgrey"}}
+                   :background-color "lightgrey"
+                   :min-width "10em"
+                   }}
      [:div {:id "module-padding"
             :style {:padding "0.5em"
                     :overflow "hidden"}}
@@ -184,8 +176,8 @@
   (fn [{:keys [score stage restart-fn add-to-leaderboard-fn]}]
     [:form {:id "username-form"
             :method "post"}
-     [:h1 "Your Score"]
-     [:h1 (str "Points " score)]
+     [:h1 "Stage " stage]
+     [:h1 "Score " score]
      [:div
       [MenuButton {:on-click restart-fn } "Play Again"]
       [MenuButton {:on-click add-to-leaderboard-fn} "Add to Leaderboard"]]]))
@@ -198,7 +190,8 @@
       [:form {:id "username-form"
               :method "post"}
        [:h1 "Submit Score"]
-       [:h1 (str "Points " score)]
+       [:h1 "Stage " stage]
+       [:h1 "Score " score]
        [:div {:id "game-name-containers"}
         [TextInput {:value @game-name
                     :default-value "Foo"
@@ -260,17 +253,17 @@
         :reagent-render (fn []
                           [:form
                            [:h1 "Latest Entries"]
-                           [:table
+                           [:table {:class "table"}
+                            [LeaderboardTableHeader]
                             [:tbody
-                             [LeaderboardTableHeader]
                              (map (fn [entry]
                                     ^{:key (:id entry)}
                                     [LeaderboardTableRow entry])
                                   @latest-entries)]]
                            [:h1 "Top Entries"]
-                           [:table
+                           [:table {:class "table"}
+                            [LeaderboardTableHeader]
                             [:tbody
-                             [LeaderboardTableHeader]
                              (map (fn [entry]
                                     ^{:key (:id entry)}
                                     [LeaderboardTableRow entry])

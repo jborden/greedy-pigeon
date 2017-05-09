@@ -701,6 +701,7 @@
                                                        (init-game-container state)
                                                        (@(r/cursor state [:init-game])))}]
         score-form [ScoreForm {:score @points
+                               :stage (+ 1 @current-stage)
                                :restart-fn (fn [e]
                                              ($ e preventDefault)
                                              (init-game-container state)
@@ -716,10 +717,7 @@
     (reset! current-form score-form)
     (r/render
      [:div
-      [GameLostScreen {:selected-menu-item selected-menu-item
-                       :url url
-                       :stage (+ 1 @current-stage)
-                       :score @points}]
+      [GameLostScreen {:url url}]
       [GameOverMenu {} current-form]]
      ($ js/document getElementById "reagent-app"))))
 
