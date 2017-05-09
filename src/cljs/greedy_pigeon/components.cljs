@@ -2,7 +2,9 @@
   (:require-macros [reagent.interop :refer [$ $!]])
   (:require [goog.dom :as dom]
             [reagent.core :as r]
-            [greedy-pigeon.display :as display]))
+            [greedy-pigeon.display :as display]
+            [greedy-pigeon.leaderboard :as leaderboard]
+            [greedy-pigeon.utilities :as utilities]))
 
 (defn ProcessingIcon
   []
@@ -165,7 +167,6 @@
 (defn GameOverMenu
   [props form]
   (fn [props form]
-    (.log js/console "GameOverMenu rendered")
     [:div {:id "menu"
            :style {:position "absolute"
                    :z-index "3"
@@ -193,8 +194,6 @@
   [props]
   (fn [{:keys [score stage name-on-change submit-fn restart-fn
                game-name retrieving?]}]
-    (.log js/console "InputNameForm rendered")
-    (.log js/console "retrieving?" @retrieving?)
     [:form {:id "username-form"
             :method "post"}
      [:h1 "Submit Score"]
@@ -210,24 +209,61 @@
         "Submit"])
      [MenuButton {:on-click restart-fn} "Play Again"]]))
 
+(defn LeaderboardTableRow
+  [row]
+  (fn [row]
+    (let [{:keys [name score id]} row
+          {:keys [score stage]} (utilities/json->clj score)]
+      [:tr
+       (doall (map identity
+                   (mapv (fn [item]
+                           ^{:key (gensym "key")}
+                           [:td item])
+                         [name score stage])))])))
+
+(defn LeaderboardTableHeader
+  []
+  (fn []
+    [:thead
+     [:tr [:td "Name"] [:td "Score"] [:td "Stage"]]]))
+
 (defn LeaderboardForm
   [props]
   (fn [{:keys [game-name submit-fn]}]
-    [:form
-     [:h1 "Latest Entries"]
-     [:table
-      [:tbody
-       [:tr [:td "foo"] [:td "0"]]
-       [:tr [:td "bar"] [:td "1"]]
-       [:tr [:td "baz"] [:td "2"]]
-       [:tr [:td "qux"] [:td "3"]]
-       [:tr [:td "corge"] [:td "4"]]]]
-     [:h1 "Top Entries"]
-     [:table
-      [:tbody
-       [:tr [:td "foo"] [:td "500"]]
-       [:tr [:td "bar"] [:td "400"]]
-       [:tr [:td "baz"] [:td "300"]]
-       [:tr [:td "qux"] [:td "200"]]
-       [:tr [:td "corge"] [:td "100"]]]]
-     [MenuButton {:on-click submit-fn} "Back to Game"]]))
+    (let [game-key "cb905938e03c465caf770d68c0f1dbda"
+          score-keyword "score"
+          latest-entries (r/atom [])
+          top-entries (r/atom [])]
+      (r/create-class
+       {:display-name "leaderboard-scores"
+
+        :component-did-mount
+        (fn [this]
+          (leaderboard/get-recent-scores game-key
+                                         (fn [response]
+                                           (reset! latest-entries
+                                                   (get-in response [:data :recentScores]))))
+          (leaderboard/get-top-scores game-key
+                                      score-keyword
+                                      (fn [response]
+                                        (reset! top-entries (get-in response [:data :topScores])))))
+
+        :reagent-render (fn []
+                          [:form
+                           [:h1 "Latest Entries"]
+                           [:table
+                            [:tbody
+                             [LeaderboardTableHeader]
+                             (map (fn [entry]
+                                    ^{:key (:id entry)}
+                                    [LeaderboardTableRow entry])
+                                  @latest-entries)]]
+                           [:h1 "Top Entries"]
+                           [:table
+                            [:tbody
+                             [LeaderboardTableHeader]
+                             (map (fn [entry]
+                                    ^{:key (:id entry)}
+                                    [LeaderboardTableRow entry])
+                                  @top-entries)]]
+                           [MenuButton {:on-click submit-fn} "Back to Game"]])}))))

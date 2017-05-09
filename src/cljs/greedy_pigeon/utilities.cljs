@@ -49,6 +49,10 @@
   [clj]
   (js/JSON.stringify (clj->js clj)))
 
+(defn json->clj
+  [json]
+  (js->clj (js/JSON.parse json) :keywordize-keys true))
+
 (defn get-input-value
   "Get the field value of a form"
   [field]
