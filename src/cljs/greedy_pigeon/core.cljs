@@ -6,6 +6,7 @@
             [howler]
             [greedy-pigeon.components :refer [AssetLoadingComponent PauseComponent TitleScreen GameContainer GameWonScreen GameLostScreen GameOverMenu InputNameForm ScoreForm LeaderboardForm]]
             [greedy-pigeon.controls :as controls]
+            [greedy-pigeon.cookies :as cookies]
             [greedy-pigeon.display :as display]
             [greedy-pigeon.leaderboard :as leaderboard]
             [greedy-pigeon.menu :as menu]
@@ -659,7 +660,9 @@
         selected-menu-item (r/cursor state [:selected-menu-item])
         points (r/cursor state [:score])
         current-stage (r/cursor state [:current-stage])
-        game-name (r/atom "Foo Bar")
+        game-name (r/atom (if-let [game-name (cookies/get-cookie "game-name")]
+                            game-name
+                            nil))
         ;; below goes into separate namespace, building here just for now
         current-form (r/atom nil)
         retrieving? (r/atom false)
@@ -672,10 +675,16 @@
         input-name-form  [InputNameForm {:score @points
                                          :stage (+ 1 @current-stage)
                                          :name-on-change #(reset! game-name (utilities/get-input-value %))
+                                         :game-name game-name
                                          :retrieving? retrieving?
                                          :submit-fn (fn [score stage game-name e]
                                                       ($ e preventDefault)
                                                       (reset! retrieving? true)
+                                                      ;; set the game name cookie
+                                                      (if (cookies/get-cookie "game-name")
+                                                        (cookies/change-cookie! "game-name" game-name)
+                                                        (cookies/set-cookie! "game-name" game-name))
+                                                      ;; post the score
                                                       (leaderboard/post-score
                                                        {:score score
                                                         :stage stage}
@@ -686,14 +695,13 @@
                                                          (reset! retrieving? false)
                                                          (let [errors (:errors response)]
                                                            (if (empty? errors)
-                                                             (reset! current-form  leaderboard-form)
+                                                             (reset! current-form leaderboard-form)
                                                              (.log js/console "there was an error: "
                                                                    (:message (first errors))))))))
                                          :restart-fn (fn [e]
                                                        ($ e preventDefault)
                                                        (init-game-container state)
-                                                       (@(r/cursor state [:init-game])))
-                                         :game-name game-name}]
+                                                       (@(r/cursor state [:init-game])))}]
         score-form [ScoreForm {:score @points
                                :restart-fn (fn [e]
                                              ($ e preventDefault)
