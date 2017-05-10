@@ -1099,8 +1099,7 @@
     ($ @scene add (.getObject3d broom))
     ($ @scene add (.getObject3d boot))
     ($ @scene add (.getObject3d shadow))
-    ;;(reset! lives 3)
-    (reset! lives 0)
+    (reset! lives 3)
     (reset! score 0)
     (reset! total-score 0)
     ;; add the tables to the scene
