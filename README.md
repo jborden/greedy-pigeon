@@ -1,6 +1,12 @@
 
 # greedy-pigeon
 
+Code - James Borden
+
+Audio and Visual Assets - Hassan Estakrian
+
+A game made for Ludum Dare 38. You can play it here: https://jborden.github.io/ld38_postjam/
+
 ## Requirements
 
 * JDK 1.8+ (figwheel will complain with JDK < 1.8, but will still work)
