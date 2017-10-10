@@ -1,9 +1,9 @@
 
 # greedy-pigeon
 
-Code - James Borden
+Code - [James Borden](https://github.com/jborden)
 
-Audio and Visual Assets - Hassan Estakrian
+Audio and Visual Assets - [Hassan Estakhrian](https://www.antennafuzz.com/)
 
 A game made for Ludum Dare 38. You can play it here: https://jborden.github.io/ld38_postjam/
 
